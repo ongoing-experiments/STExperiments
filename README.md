@@ -14,7 +14,7 @@ Dependencies:
 
 /gui/stexp						(Java GUI for visualization.)
 
-/scripts							(2.7 Python scripts where the algorithm were implemented.)
+/scripts							(2.7 Python scripts where the algorithms were implemented.)
 
 /tests							(Files with some execution results.)
 
