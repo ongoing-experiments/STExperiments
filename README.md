@@ -14,6 +14,6 @@ Dependencies:
 /tests							files with some execution results
 
 vm with everything installed available at:
-https://drive.google.com/file/d/12YArM0IbNKz7ckSZlebVUhYbI5iizxEG/view?usp=sharing
+https://drive.google.com/file/d/15KV4NfyzFL3L1kKFf1Or6-TG0Pk6sHmb/view?usp=sharing
 
 pass: user
