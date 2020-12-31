@@ -4,6 +4,10 @@ Paper:
 
 Using Morphing Techniques to Represent and Query the Evolution of Deformable Moving Objects (source and artifacts)
 
+Watch the videos!
+
+Contact: hfduarte@ua.pt
+
 Dependencies:
 
 	Python 2.7
