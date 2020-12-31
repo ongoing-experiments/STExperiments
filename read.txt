@@ -4,7 +4,7 @@ Dependencies:
 	shapely
 	java
 	jts (java topology suite)
-
+    jfreechart
 
 To get testing data, use:
 
