@@ -6,24 +6,20 @@ Using Morphing Techniques to Represent and Query the Evolution of Deformable Mov
 
 Dependencies:
 
-	python 2.7
-	
-	shapely
-	
-	java
-	
-	jts (java topology suite)
-	
-    jfreechart
+	Python 2.7
+	Shapely
+	Java
+	JTS (Java Topology Suite)
+    Jfreechart
 
-/gui/stexp						java GUI for visualization
+/gui/stexp						(Java GUI for visualization.)
 
-/scripts							2.7 python scripts where the algorithm were implemented.
+/scripts							(2.7 Python scripts where the algorithm were implemented.)
 
-/tests							files with some execution results
+/tests							(Files with some execution results.)
 
-vm with everything installed available at:
+WM with everything installed available at:
 
 https://drive.google.com/file/d/15KV4NfyzFL3L1kKFf1Or6-TG0Pk6sHmb/view?usp=sharing
 
-pass: user
+Pass: user
