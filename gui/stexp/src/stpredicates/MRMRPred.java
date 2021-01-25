@@ -176,6 +176,7 @@ public class MRMRPred extends JFrame
 	private String execution_time;
 	private String predicate;
 	private boolean shoe_predicate_info;
+	private JCheckBox use_opt_cb;
 	
 	public MRMRPred(Data d) 
 	{	
@@ -421,15 +422,23 @@ public class MRMRPred extends JFrame
         		return;
         	
 			Point c = geometry.getCentroid();
-
+			
+			System.out.println(mr_p_i[0]);
+			
 			cx = c.getX();
 			cy = c.getY();
 
+			System.out.println(cx);
+			System.out.println(cy);
+			
 			w_center = (int) (this.getParent().getWidth() / 2);
 			h_center = (int) (this.getParent().getHeight() / 2);
 			
 			dx = (int) ((-cx + w_center));
 			dy = (int) ((cy + h_center));
+			
+			System.out.println(dx);
+			System.out.println(dy);
         }
         
 		@Override
@@ -675,7 +684,7 @@ public class MRMRPred extends JFrame
 		n_samples.setBounds(1115, 73, 155, 14);
 		contentPane.add(n_samples);
 		
-	    n_samples.setText("Nº Samples: 0");
+	    n_samples.setText("Nï¿½ Samples: 0");
 	    
 	    n_samples_tx = new JTextField();
 	    n_samples_tx.setToolTipText("Number of samples for vizualisation.");
@@ -778,7 +787,7 @@ public class MRMRPred extends JFrame
 	    n_dec_dig_tx.setColumns(10);
 	    
 	    op_cb = new JComboBox<>();
-	    op_cb.setModel(new DefaultComboBoxModel(new String[] {"Intersects", "Touches (Meets)", "Equals", "Disjoint", "Contains", "Within (Inside)", "Overlaps", "CoveredBy", "Covers"}));
+	    op_cb.setModel(new DefaultComboBoxModel(new String[] {"Intersects", "Touches (Meets)", "Equals", "Disjoint", "Within (Inside)", "Overlaps", "CoveredBy", "Covers"}));
 	    op_cb.setSelectedIndex(0);
 	    op_cb.setBounds(10, 106, 155, 20);
 	    contentPane.add(op_cb);
@@ -844,6 +853,12 @@ public class MRMRPred extends JFrame
 		btn_Intersects.setFont(new Font("Tahoma", Font.BOLD, 11));
 		btn_Intersects.setBounds(8, 523, 155, 23);
 		contentPane.add(btn_Intersects);
+		
+		use_opt_cb = new JCheckBox("Use Optimization");
+		use_opt_cb.setToolTipText("");
+		use_opt_cb.setSelected(true);
+		use_opt_cb.setBounds(10, 495, 155, 23);
+		contentPane.add(use_opt_cb);		
 	}
 
 	public void add_listeners()
@@ -1107,7 +1122,7 @@ public class MRMRPred extends JFrame
 				String[] cmd = new String[14];
 				
 				cmd[0] = "python";
-				cmd[1] = "D:\\java\\mr_mr_int_predicate.py";				
+				cmd[1] = "/home/user/STExperiments/scripts/mr_mr_intersects.py";				
 			
 				cmd[2] = p1.getText();
 				cmd[3] = q1.getText();
@@ -1231,17 +1246,16 @@ public class MRMRPred extends JFrame
 				}
 				*/
 				
-				String[] cmd = new String[14];
+				String[] cmd = new String[15];
 				
 				cmd[0] = "python";
-				cmd[1] = "D:\\java\\mr_mr_pred.py";				
+				cmd[1] = "/home/user/STExperiments/scripts/mr_mr_pred.py";				
 			
 				cmd[2] = p1.getText();
 				cmd[3] = q1.getText();
 
 				cmd[4] = P2.getText();
 				cmd[5] = Q2.getText();
-				
 				
 				// disjoint
 				/*
@@ -1271,6 +1285,11 @@ public class MRMRPred extends JFrame
 				cmd[11] = prec;
 				cmd[12] = n_dec_dig;
 				cmd[13] = op;
+				
+				if (use_opt_cb.isSelected())				
+					cmd[14] = "1";
+				else
+					cmd[14] = "0";				
 				
 				Runtime rt = Runtime.getRuntime();
 				Process pr = null;
@@ -1329,7 +1348,7 @@ public class MRMRPred extends JFrame
 				intersection_info = arr[mr_p_i_len - m];		
 				max = mr_p_i.length / 3;
 								
-				n_samples.setText("Nº Samples: " + String.valueOf(max));
+				n_samples.setText("Nï¿½ Samples: " + String.valueOf(max));
 				
 				show_m_region_evolution_slider.setMinimum(0);
 				show_m_region_evolution_slider.setMaximum(max);
@@ -1474,7 +1493,7 @@ public class MRMRPred extends JFrame
 				intersection_info = arr[mr_p_i_len - m];		
 				max = mr_p_i.length / 3;
 								
-				n_samples.setText("Nº Samples: " + String.valueOf(max));
+				n_samples.setText("Nï¿½ Samples: " + String.valueOf(max));
 				
 				show_m_region_evolution_slider.setMinimum(0);
 				show_m_region_evolution_slider.setMaximum(max);

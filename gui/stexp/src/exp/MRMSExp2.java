@@ -762,7 +762,7 @@ public class MRMSExp2 extends JFrame
 		n_samples.setBounds(1115, 73, 155, 14);
 		contentPane.add(n_samples);
 		
-	    n_samples.setText("Nº Samples: 0");
+	    n_samples.setText("Nï¿½ Samples: 0");
 	    
 	    n_samples_tx = new JTextField();
 	    n_samples_tx.setToolTipText("Number of samples for vizualisation.");
@@ -1057,7 +1057,7 @@ public class MRMSExp2 extends JFrame
 				String[] cmd = new String[14];
 				
 				cmd[0] = "python";
-				cmd[1] = "D:\\java\\mr_ms_exp_pred2.py";				
+				cmd[1] = "/home/user/STExperiments/scripts/mr_ms_exp_pred2.py";				
 			
 				cmd[2] = p1.getText();
 				cmd[3] = q1.getText();
@@ -1155,7 +1155,7 @@ public class MRMSExp2 extends JFrame
 				intersection_info = arr[mr_p_i_len - m];		
 				max = mr_p_i.length / 4;
 								
-				n_samples.setText("Nº Samples: " + String.valueOf(max));
+				n_samples.setText("Nï¿½ Samples: " + String.valueOf(max));
 				
 				show_m_region_evolution_slider.setMinimum(0);
 				show_m_region_evolution_slider.setMaximum(max);

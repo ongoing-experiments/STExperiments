@@ -17294,7 +17294,39 @@ test_nl(ms1, ms2, initial_state, final_state, interval, n_samples)
 import os
 from pathlib2 import Path
 
-dir = 'E:\\Anime'
+dir = 'E:\\back\\Anime'
+
+for entry in os.listdir(dir):
+    _dir = os.path.join(dir, entry)
+    if os.path.isdir(_dir):
+        for r, d, f in os.walk(_dir):
+        #print('')
+            if len(d) > 0:
+                print(entry)
+    #else:
+    #    print('')
+    #    o = Path(os.path.join(dir, entry))
+    #    print(entry + '    ' + str(o.stat().st_size / (1024 * 1024)) + ' MB')
+
+# r=root, d=directories, f = files
+
+sys.exit()
+
+dir = 'E:\\back\\Anime\\_Quality_Issues'
+
+for entry in os.listdir(dir):
+    _dir = os.path.join(dir, entry)
+    if os.path.isdir(_dir):
+        #print('')
+        print(entry)
+    #else:
+    #    print('')
+    #    o = Path(os.path.join(dir, entry))
+    #    print(entry + '    ' + str(o.stat().st_size / (1024 * 1024)) + ' MB')
+
+# r=root, d=directories, f = files
+
+sys.exit()
 
 for entry in os.listdir(dir):
     _dir = os.path.join(dir, entry)

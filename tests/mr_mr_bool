@@ -1,0 +1,11 @@
+Mr X Mr -> Bool : N Tests: 100 : Filter Step: True
+Op;mET (sec);MET (sec);mSET (sec);MSET (sec);AVGET %;NE;ONE;R;NV1;NV2;
+Intersects;0,015;0,032;0,000;0,031;52,98;2;116;True;41;19;
+Intersects;0,031;0,063;0,031;0,062;80,81;2;1596;True;41;19;
+Intersects;0,000;0,016;0,000;0,000;0,00;0;0;True;41;19;
+Intersects;0,046;0,079;0,015;0,047;70,21;2;1516;True;40;63;
+Intersects;0,031;0,063;0,000;0,047;65,77;2;1468;True;40;63;
+Intersects;0,093;0,125;0,062;0,110;84,38;2;5580;True;40;63;
+Intersects;0,125;0,188;0,093;0,172;88,48;0;10080;False;40;63;
+Intersects;0,109;0,156;0,078;0,141;86,45;2;7100;True;40;63;
+Intersects;0,234;0,312;0,000;0,031;3,71;2;20;True;850;850;

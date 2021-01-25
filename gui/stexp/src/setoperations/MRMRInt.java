@@ -735,7 +735,7 @@ public class MRMRInt extends JFrame
 		n_samples.setBounds(1115, 73, 155, 14);
 		contentPane.add(n_samples);
 		
-	    n_samples.setText("Nº Samples: 0");
+	    n_samples.setText("Nï¿½ Samples: 0");
 	    
 	    n_samples_tx = new JTextField();
 	    n_samples_tx.setToolTipText("Number of samples for vizualisation.");
@@ -1030,7 +1030,7 @@ public class MRMRInt extends JFrame
 				String[] cmd = new String[14];
 				
 				cmd[0] = "python";
-				cmd[1] = "D:\\java\\mr_mr_int.py";				
+				cmd[1] = "/home/user/STExperiments/scripts/mr_mr_int.py";				
 			
 				cmd[2] = p1.getText();
 				cmd[3] = q1.getText();
@@ -1130,7 +1130,7 @@ public class MRMRInt extends JFrame
 				intersection_info = arr[mr_p_i_len - m];		
 				max = mr_p_i.length / Nr;
 				//max = mr_p_i.length;
-				n_samples.setText("Nº Samples: " + String.valueOf(max));
+				n_samples.setText("Nï¿½ Samples: " + String.valueOf(max));
 				
 				//System.out.println(max);
 				
