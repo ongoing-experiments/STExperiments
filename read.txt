@@ -9,11 +9,11 @@ Dependencies:
 To get testing data, use:
 
 .
-python mr_mr_pred.py <m_tests>
-python mr_mr_pred.py 1 >> mr_mr_pred_tests_csv
+python mr_mp_pred2.py <m_tests>
+python mr_mp_pred2.py 1 >> mr_mr_pred_tests_csv
 
 .
-python mr_mp_pred.py <m_tests> <use_filter_step> <type_operation>
+python mr_mr_pred.py <m_tests> <use_filter_step> <type_operation>
 
 Tests with (without) filter step, mr x mr > P
 python mr_mr_pred.py 1 1 0 >> mr_mr_p_w_filter_step

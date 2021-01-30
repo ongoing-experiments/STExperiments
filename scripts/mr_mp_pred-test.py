@@ -11,6 +11,10 @@ import numpy as np
 import time
 import math
 import enum
+#import mpypol
+
+from roots import *
+from funcs import from_roots
 
 #sys.float_info
 
@@ -39,6 +43,8 @@ from math import atan
 
 from Utils import distance
 from sympy import S 
+
+#from pypol import Monomial as MONO, Polynomial as POLY
 
 # import complex math module
 import cmath
@@ -1297,6 +1303,16 @@ def get_solutions_quartic(a, b, c, g, h, l, r, q, f, m, n, o, d, s, x, y, w, z, 
     #print(r)
     return solver_exec_time, r
 
+"""
+def find_roots(poly, x):
+    r = []
+    for _ in xrange(poly.degree):
+        next_root = muller(poly, x)
+        r.append(next_root)
+        poly /= (x - next_root)
+    return r
+"""
+
 def get_solutions_quartic2(a, b, c, g, h, l, r, q, f, m, n, o, d, s, w, v, y, x, k, u, z, p, it):
     global eps
 
@@ -1321,38 +1337,46 @@ def get_solutions_quartic2(a, b, c, g, h, l, r, q, f, m, n, o, d, s, w, v, y, x,
     coeff += [a0]
 
     r = np.roots(coeff)
-    e_exec_time = time.time()
-
-    solver_exec_time = e_exec_time - s_exec_time
+    #r1 = quartic(poly1d([a4, a3, a2, a1, a0]))
+    #r1 = muller(poly1d([a4, a3, a2, a1, a0]), 10)
+    #r1 = find_roots(poly1d([a4, a3, a2, a1, a0]))
+    #r1 = ruffini(poly1d([a4, a3, a2, a1, a0]))
+    #r1 = durand_kerner(poly1d([a4, a3, a2, a1, a0]))
+    
+    #print(r)
+    #print(r1)    
+    #sys.exit()
 
     # I believe that the result may contain only real solutions since the domain is (explicitly) real?
     #r = [re(_r) for _r in r if im(_r) == 0 and _r >= 0 and _r <= 1]
-    r = [re(_r) for _r in r if im(_r) == 0]
-    r.sort()
+    #r = [re(_r) for _r in r if im(_r) == 0]
+    #r.sort()
 
     N = len(r)
     K = 0
+    rroots = []
 
     while K < N:
-        if r[K] >= it.x - eps and r[K] <= it.x + eps:
-            r[K] = it.x
-        elif r[K] >= it.y - eps and r[K] <= it.y + eps:
-            r[K] = it.y
-
+        v = r[K]
+    
+        if im(v) == 0:
+            v = re(v)
+            
+            if v >= it.x - eps and v <= it.x + eps:
+                rroots += [it.x]
+            elif v >= it.y - eps and v <= it.y + eps:
+                rroots += [it.y]
+            elif v >= it.x and v <= it.y:
+                rroots += [v]
+            
         K += 1
 
-    K = 0
-    _r = []
+    rroots.sort()
 
-    while K < N:
-        if r[K] >= it.x and r[K] <= it.y:
-            _r += [r[K]]
+    e_exec_time = time.time()
+    _exec_time = e_exec_time - s_exec_time
 
-        K += 1
-
-    r = _r
-
-    return solver_exec_time, r
+    return _exec_time, rroots
 
 def get_solutions_quad(a0, a1, a2):
     global eps
@@ -4604,9 +4628,7 @@ def intersections_tests(MS, mp, initial_state, final_state, op = 1, p_linear_tra
     #if op == STOperation.Intersection.value:
     #    print(intersection_geom.wkt)
 
-    NIT = len(intersections)
-
-    return NIT, exec_time, solver_exec_time, ((solver_exec_time * 100) / exec_time), seconds, sseconds
+    return exec_time, solver_exec_time, ((solver_exec_time * 100) / exec_time), seconds, sseconds
 
 """
     polygons:
@@ -6799,7 +6821,7 @@ def test1(N, mpoint_st, p_linear_traj):
 
             mpoint = create_moving_point([mpoint])
 
-            NIT, exec_time, solver_exec_time, avg, sec, ssec = intersections_tests(reg_m_segs, mpoint, initial_state, final_state, op, p_linear_traj)
+            exec_time, solver_exec_time, avg, sec, ssec = intersections_tests(reg_m_segs, mpoint, initial_state, final_state, op, p_linear_traj)
 
             min_exec_time = min(min_exec_time, exec_time)
             max_exec_time = max(max_exec_time, exec_time)
@@ -6834,6 +6856,9 @@ def test1(N, mpoint_st, p_linear_traj):
 def test2(N, p_wkt, q_wkt, mpoint_st, p_linear_traj):
     op_id = [1, 2, 4, 5, 6]
     op_st = ['Intersects', 'Touches', 'Disjoint', 'Contains', 'Within']
+
+    #op_id = [1]
+    #op_st = ['Intersects']
 
     global solver_exec_times
     global solver_exec_time
@@ -6887,7 +6912,7 @@ def test2(N, p_wkt, q_wkt, mpoint_st, p_linear_traj):
 
             mpoint = create_moving_point([mpoint])
 
-            NIT, exec_time, solver_exec_time, avg, sec, ssec = intersections_tests(reg_m_segs, mpoint, initial_state, final_state, op, p_linear_traj)
+            exec_time, solver_exec_time, avg, sec, ssec = intersections_tests(reg_m_segs, mpoint, initial_state, final_state, op, p_linear_traj)
 
             min_exec_time = min(min_exec_time, exec_time)
             max_exec_time = max(max_exec_time, exec_time)
@@ -6902,7 +6927,7 @@ def test2(N, p_wkt, q_wkt, mpoint_st, p_linear_traj):
         M = len(loads(p_wkt).exterior.coords) - 1
 
         t_avg = t_avg / N
-        res += [(format(min_exec_time, precision3), format(max_exec_time, precision3), format(min_solver_exec_time, precision3), format(max_solver_exec_time, precision3), format(t_avg, precision), str(M), str(NIT))]
+        res += [(format(min_exec_time, precision3), format(max_exec_time, precision3), format(min_solver_exec_time, precision3), format(max_solver_exec_time, precision3), format(t_avg, precision), str(M))]
 
     return res
 
@@ -6927,9 +6952,8 @@ def change_coords_precision(p_wkt, precision):
     return nwkt
 
 """
-
 	Tests
-	python mr_mp_pred.py 1
+	python mr_mp_pred-test.py 1
 
 	Equals = Within and Contains
 	
@@ -7017,7 +7041,7 @@ if TESTING:
     op_st = ['Intersects', 'Touches', 'Disjoint', 'Contains', 'Within']
 
     print('MR X MP -> P : N Tests: ' + str(NTESTS))
-    print('Op;mET (sec);MET (sec);mSET (sec);MSET (sec);AVGET %;NV;NIT')
+    print('Op;mET (sec);MET (sec);mSET (sec);MSET (sec);AVGET %;NV')
 
     k = 0
     while k < len(op_st):

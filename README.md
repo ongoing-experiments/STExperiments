@@ -24,6 +24,6 @@ Dependencies:
 
 WM with everything installed available at:
 
-https://drive.google.com/file/d/15KV4NfyzFL3L1kKFf1Or6-TG0Pk6sHmb/view?usp=sharing
+https://drive.google.com/file/d/19wwY8qKCiANBKsVuTVE_Ef96X1Kcngr4/view?usp=sharing
 
 Pass: user

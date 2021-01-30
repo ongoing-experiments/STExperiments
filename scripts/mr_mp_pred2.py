@@ -12,6 +12,8 @@ import time
 import math
 import enum
 
+#from numba import jit
+
 #sys.float_info
 
 from sympy import symbols, Eq, solve, re, im, S, Interval as SpyInterval
@@ -259,6 +261,80 @@ class MSU:
         self.c1 = c1
         self.i = i
 
+        c = self.c0.curves[0]
+        
+        x1 = c.cp0.x
+        y1 = c.cp0.y
+
+        x2 = c.cp1.x
+        y2 = c.cp1.y
+
+        x3 = c.cp2.x
+        y3 = c.cp2.y
+
+        m0, b0 = f(x1, y1, x3, y3)
+        mp, bp = f_p(x2, y2, m0)
+
+        c = self.c1.curves[0]
+        
+        x4 = c.cp0.x
+        y4 = c.cp0.y
+
+        x5 = c.cp1.x
+        y5 = c.cp1.y
+
+        x6 = c.cp2.x
+        y6 = c.cp2.y
+
+        m1, b1 = f(x4, y4, x6, y6)
+        mp1, bp1 = f_p(x5, y5, m1)
+
+        ma, ba = f(x1, y1, x4, y4)
+        mb, bb = f(x3, y3, x6, y6)
+
+        xa, ya = fi(ma, ba, mp, bp)
+        xb, yb = fi(mb, bb, mp, bp)
+
+        xc, yc = fi(ma, ba, mp1, bp1)
+        xd, yd = fi(mb, bb, mp1, bp1)
+
+        d1 = distance(x1, y1, x4, y4)
+        d2 = distance(xa, ya, x4, y4)
+
+        self.min1 = None
+        self.max1 = None
+
+        self.min2 = None
+        self.max2 = None
+
+        if d1 < d2:
+            self.min1 = (x1, y1, x3, y3)
+            self.max1 = (xa, ya, xb, yb)
+        else:
+            self.max1 = (x1, y1, x3, y3)
+            self.min1 = (xa, ya, xb, yb)
+
+        d2 = distance(xc, yc, x1, y1)
+
+        if d1 < d2:
+            self.min2 = (x4, y4, x6, y6)
+            self.max2 = (xc, yc, xd, yd)
+        else:
+            self.max2 = (x4, y4, x6, y6)
+            self.min2 = (xc, yc, xd, yd)
+
+        minx = min(min(self.max1[0], self.max1[2]), min(self.max2[0], self.max2[2]))
+        miny = min(min(self.max1[1], self.max1[3]), min(self.max2[1], self.max2[3]))
+        maxx = max(max(self.max1[0], self.max1[2]), max(self.max2[0], self.max2[2]))
+        maxy = max(max(self.max1[1], self.max1[3]), max(self.max2[1], self.max2[3]))
+
+        #self.bb = (minx, miny, maxx, maxy)
+
+        self.left = minx
+        self.right = maxx
+        self.top = maxy
+        self.bottom = miny
+
     def at(self, t):
         Ax, Ay = self.c0.at(t)
         Bx, By = self.c1.at(t)
@@ -281,6 +357,27 @@ class MPU2:
     def __init__(self, c, i):
         self.c = c
         self.i = i
+
+        c = self.c.curves[0]
+
+        x1 = c.cp0.x
+        y1 = c.cp0.y
+
+        x2 = c.cp1.x
+        y2 = c.cp1.y
+
+        x3 = c.cp2.x
+        y3 = c.cp2.y
+
+        minx = min(min(x1, x2), x3)
+        miny = min(min(y1, y2), y3)
+        maxx = max(max(x1, x2), x3)
+        maxy = max(max(y1, y2), y3)
+
+        self.left = minx
+        self.right = maxx
+        self.top = maxy
+        self.bottom = miny
 
     def at(self, t):
         Ax, Ay = self.c.at(t)
@@ -1297,6 +1394,24 @@ def get_solutions_quartic(a, b, c, g, h, l, r, q, f, m, n, o, d, s, x, y, w, z, 
     #print(r)
     return solver_exec_time, r
 
+def roots_vec(p):
+    p = np.atleast_1d(p)
+    n = p.shape[-1]
+    A = np.zeros(p.shape[:1] + (n-1, n-1), float)
+    A[...,1:,:-1] = np.eye(n-2)
+
+    d = p[...,None,0]
+
+    if d == 0:
+        return [[]]
+
+    #A[...,0,:] = -p[...,1:]/p[...,None,0]
+    A[...,0,:] = -p[...,1:]/d
+    return np.linalg.eigvals(A)
+
+
+#@numba.jit(nopython=True, parallel=True)
+#@jit(nopython=True)
 def get_solutions_quartic2(a, b, c, g, h, l, r, q, f, m, n, o, d, s, w, v, y, x, k, u, z, p, it):
     global eps
 
@@ -1308,11 +1423,14 @@ def get_solutions_quartic2(a, b, c, g, h, l, r, q, f, m, n, o, d, s, w, v, y, x,
     #a3 = (-a*d**2*z - 4*a*d*k*m + 6*a*d*k*n - 2*a*d*k*o - 4*a*k*m*s + 8*a*k*n*s - 4*a*k*o*s + 2*b*d**2*z + 6*b*d*k*m - 8*b*d*k*n + 2*b*d*k*o + 8*b*k*m*s - 16*b*k*n*s + 8*b*k*o*s - c*d**2*z - 2*c*d*k*m + 2*c*d*k*n - 4*c*k*m*s + 8*c*k*n*s - 4*c*k*o*s + d**2*f*z + d**2*g*w - 2*d**2*h*w + d**2*l*w - d**2*m*w + 2*d**2*n*w - d**2*o*w - 2*d**2*q*z + d**2*r*z + 2*d*f*g*k - 2*d*f*h*k - 6*d*g*k*q + 4*d*g*k*r + 8*d*h*k*q - 6*d*h*k*r - 2*d*k*l*q + 2*d*k*l*r + 4*f*g*k*s - 8*f*h*k*s + 4*f*k*l*s - 8*g*k*q*s + 4*g*k*r*s + 16*h*k*q*s - 8*h*k*r*s - 8*k*l*q*s + 4*k*l*r*s ) / (d**4*k)
     #a4 = (a*k*m - 2*a*k*n + a*k*o - 2*b*k*m + 4*b*k*n - 2*b*k*o + c*k*m - 2*c*k*n + c*k*o - f*g*k + 2*f*h*k - f*k*l + 2*g*k*q - g*k*r - 4*h*k*q + 2*h*k*r + 2*k*l*q - k*l*r ) / (d**4*k)
 
-    a0 = (+2*a*d**4*k*p*z + 2*a*d**4*k*z**2 + a*d**4*m*p**2 - a*d**4*p**2*x - 2*a*d**4*p*x*z - a*d**4*u*z**2 - a*d**4*x*z**2 + 4*a*d**3*k*p*s*z + 4*a*d**3*k*s*z**2 + 4*a*d**3*m*p**2*s - 2*a*d**3*n*p**2*s - 2*a*d**3*p**2*s*x - 4*a*d**3*p*s*x*z - 2*a*d**3*s*u*z**2 - 2*a*d**3*s*x*z**2 + 2*a*d**2*k*p*s**2*z + 2*a*d**2*k*s**2*z**2 + 6*a*d**2*m*p**2*s**2 - 6*a*d**2*n*p**2*s**2 + a*d**2*o*p**2*s**2 - a*d**2*p**2*s**2*x - 2*a*d**2*p*s**2*x*z - a*d**2*s**2*u*z**2 - a*d**2*s**2*x*z**2 + 4*a*d*m*p**2*s**3 - 6*a*d*n*p**2*s**3 + 2*a*d*o*p**2*s**3 + a*m*p**2*s**4 - 2*a*n*p**2*s**4 + a*o*p**2*s**4 - 4*b*d**3*k*p*s*z - 4*b*d**3*k*s*z**2 - 2*b*d**3*m*p**2*s + 2*b*d**3*p**2*s*x + 4*b*d**3*p*s*x*z + 2*b*d**3*s*u*z**2 + 2*b*d**3*s*x*z**2 - 4*b*d**2*k*p*s**2*z - 4*b*d**2*k*s**2*z**2 - 6*b*d**2*m*p**2*s**2 + 4*b*d**2*n*p**2*s**2 + 2*b*d**2*p**2*s**2*x + 4*b*d**2*p*s**2*x*z + 2*b*d**2*s**2*u*z**2 + 2*b*d**2*s**2*x*z**2 - 6*b*d*m*p**2*s**3 + 8*b*d*n*p**2*s**3 - 2*b*d*o*p**2*s**3 - 2*b*m*p**2*s**4 + 4*b*n*p**2*s**4 - 2*b*o*p**2*s**4 + 2*c*d**2*k*p*s**2*z + 2*c*d**2*k*s**2*z**2 + c*d**2*m*p**2*s**2 - c*d**2*p**2*s**2*x - 2*c*d**2*p*s**2*x*z - c*d**2*s**2*u*z**2 - c*d**2*s**2*x*z**2 + 2*c*d*m*p**2*s**3 - 2*c*d*n*p**2*s**3 + c*m*p**2*s**4 - 2*c*n*p**2*s**4 + c*o*p**2*s**4 - d**4*g*p**2*r + d**4*g*p**2*w - 2*d**4*g*p*v*z + 2*d**4*g*p*w*z - 2*d**4*g*v*z**2 + d**4*g*w*z**2 + d**4*g*y*z**2 - 2*d**4*k*p*r*z - 2*d**4*k*r*z**2 - d**4*m*p**2*w + 2*d**4*m*p*v*z - 2*d**4*m*p*w*z + 2*d**4*m*v*z**2 - d**4*m*w*z**2 - d**4*m*y*z**2 + d**4*p**2*r*x + 2*d**4*p*r*x*z + d**4*r*u*z**2 + d**4*r*x*z**2 + 2*d**3*g*p**2*q*s - 4*d**3*g*p**2*r*s + 2*d**3*g*p**2*s*w - 4*d**3*g*p*s*v*z + 4*d**3*g*p*s*w*z - 4*d**3*g*s*v*z**2 + 2*d**3*g*s*w*z**2 + 2*d**3*g*s*y*z**2 + 2*d**3*h*p**2*r*s - 2*d**3*h*p**2*s*w + 4*d**3*h*p*s*v*z - 4*d**3*h*p*s*w*z + 4*d**3*h*s*v*z**2 - 2*d**3*h*s*w*z**2 - 2*d**3*h*s*y*z**2 + 4*d**3*k*p*q*s*z - 4*d**3*k*p*r*s*z + 4*d**3*k*q*s*z**2 - 4*d**3*k*r*s*z**2 - 2*d**3*m*p**2*s*w + 4*d**3*m*p*s*v*z - 4*d**3*m*p*s*w*z + 4*d**3*m*s*v*z**2 - 2*d**3*m*s*w*z**2 - 2*d**3*m*s*y*z**2 + 2*d**3*n*p**2*s*w - 4*d**3*n*p*s*v*z + 4*d**3*n*p*s*w*z - 4*d**3*n*s*v*z**2 + 2*d**3*n*s*w*z**2 + 2*d**3*n*s*y*z**2 - 2*d**3*p**2*q*s*x + 2*d**3*p**2*r*s*x - 4*d**3*p*q*s*x*z + 4*d**3*p*r*s*x*z - 2*d**3*q*s*u*z**2 - 2*d**3*q*s*x*z**2 + 2*d**3*r*s*u*z**2 + 2*d**3*r*s*x*z**2 - d**2*f*g*p**2*s**2 - 2*d**2*f*k*p*s**2*z - 2*d**2*f*k*s**2*z**2 + d**2*f*p**2*s**2*x + 2*d**2*f*p*s**2*x*z + d**2*f*s**2*u*z**2 + d**2*f*s**2*x*z**2 + 6*d**2*g*p**2*q*s**2 - 6*d**2*g*p**2*r*s**2 + d**2*g*p**2*s**2*w - 2*d**2*g*p*s**2*v*z + 2*d**2*g*p*s**2*w*z - 2*d**2*g*s**2*v*z**2 + d**2*g*s**2*w*z**2 + d**2*g*s**2*y*z**2 - 4*d**2*h*p**2*q*s**2 + 6*d**2*h*p**2*r*s**2 - 2*d**2*h*p**2*s**2*w + 4*d**2*h*p*s**2*v*z - 4*d**2*h*p*s**2*w*z + 4*d**2*h*s**2*v*z**2 - 2*d**2*h*s**2*w*z**2 - 2*d**2*h*s**2*y*z**2 + 4*d**2*k*p*q*s**2*z - 2*d**2*k*p*r*s**2*z + 4*d**2*k*q*s**2*z**2 - 2*d**2*k*r*s**2*z**2 - d**2*l*p**2*r*s**2 + d**2*l*p**2*s**2*w - 2*d**2*l*p*s**2*v*z + 2*d**2*l*p*s**2*w*z - 2*d**2*l*s**2*v*z**2 + d**2*l*s**2*w*z**2 + d**2*l*s**2*y*z**2 - d**2*m*p**2*s**2*w + 2*d**2*m*p*s**2*v*z - 2*d**2*m*p*s**2*w*z + 2*d**2*m*s**2*v*z**2 - d**2*m*s**2*w*z**2 - d**2*m*s**2*y*z**2 + 2*d**2*n*p**2*s**2*w - 4*d**2*n*p*s**2*v*z + 4*d**2*n*p*s**2*w*z - 4*d**2*n*s**2*v*z**2 + 2*d**2*n*s**2*w*z**2 + 2*d**2*n*s**2*y*z**2 - d**2*o*p**2*s**2*w + 2*d**2*o*p*s**2*v*z - 2*d**2*o*p*s**2*w*z + 2*d**2*o*s**2*v*z**2 - d**2*o*s**2*w*z**2 - d**2*o*s**2*y*z**2 - 2*d**2*p**2*q*s**2*x + d**2*p**2*r*s**2*x - 4*d**2*p*q*s**2*x*z + 2*d**2*p*r*s**2*x*z - 2*d**2*q*s**2*u*z**2 - 2*d**2*q*s**2*x*z**2 + d**2*r*s**2*u*z**2 + d**2*r*s**2*x*z**2 - 2*d*f*g*p**2*s**3 + 2*d*f*h*p**2*s**3 + 6*d*g*p**2*q*s**3 - 4*d*g*p**2*r*s**3 - 8*d*h*p**2*q*s**3 + 6*d*h*p**2*r*s**3 + 2*d*l*p**2*q*s**3 - 2*d*l*p**2*r*s**3 - f*g*p**2*s**4 + 2*f*h*p**2*s**4 - f*l*p**2*s**4 + 2*g*p**2*q*s**4 - g*p**2*r*s**4 - 4*h*p**2*q*s**4 + 2*h*p**2*r*s**4 + 2*l*p**2*q*s**4 - l*p**2*r*s**4 ) / (d**4*p**2)
-    a1 = (-2*a*d**4*k*p - 4*a*d**4*k*z + 2*a*d**4*p*x + 2*a*d**4*u*z + 2*a*d**4*x*z - 4*a*d**3*k*p*s - 4*a*d**3*k*p*z - 8*a*d**3*k*s*z - 4*a*d**3*k*z**2 - 4*a*d**3*m*p**2 + 2*a*d**3*n*p**2 + 2*a*d**3*p**2*x + 4*a*d**3*p*s*x + 4*a*d**3*p*x*z + 4*a*d**3*s*u*z + 4*a*d**3*s*x*z + 2*a*d**3*u*z**2 + 2*a*d**3*x*z**2 - 2*a*d**2*k*p*s**2 - 4*a*d**2*k*p*s*z - 4*a*d**2*k*s**2*z - 4*a*d**2*k*s*z**2 - 12*a*d**2*m*p**2*s + 12*a*d**2*n*p**2*s - 2*a*d**2*o*p**2*s + 2*a*d**2*p**2*s*x + 2*a*d**2*p*s**2*x + 4*a*d**2*p*s*x*z + 2*a*d**2*s**2*u*z + 2*a*d**2*s**2*x*z + 2*a*d**2*s*u*z**2 + 2*a*d**2*s*x*z**2 - 12*a*d*m*p**2*s**2 + 18*a*d*n*p**2*s**2 - 6*a*d*o*p**2*s**2 - 4*a*m*p**2*s**3 + 8*a*n*p**2*s**3 - 4*a*o*p**2*s**3 + 4*b*d**3*k*p*s + 4*b*d**3*k*p*z + 8*b*d**3*k*s*z + 4*b*d**3*k*z**2 + 2*b*d**3*m*p**2 - 2*b*d**3*p**2*x - 4*b*d**3*p*s*x - 4*b*d**3*p*x*z - 4*b*d**3*s*u*z - 4*b*d**3*s*x*z - 2*b*d**3*u*z**2 - 2*b*d**3*x*z**2 + 4*b*d**2*k*p*s**2 + 8*b*d**2*k*p*s*z + 8*b*d**2*k*s**2*z + 8*b*d**2*k*s*z**2 + 12*b*d**2*m*p**2*s - 8*b*d**2*n*p**2*s - 4*b*d**2*p**2*s*x - 4*b*d**2*p*s**2*x - 8*b*d**2*p*s*x*z - 4*b*d**2*s**2*u*z - 4*b*d**2*s**2*x*z - 4*b*d**2*s*u*z**2 - 4*b*d**2*s*x*z**2 + 18*b*d*m*p**2*s**2 - 24*b*d*n*p**2*s**2 + 6*b*d*o*p**2*s**2 + 8*b*m*p**2*s**3 - 16*b*n*p**2*s**3 + 8*b*o*p**2*s**3 - 2*c*d**2*k*p*s**2 - 4*c*d**2*k*p*s*z - 4*c*d**2*k*s**2*z - 4*c*d**2*k*s*z**2 - 2*c*d**2*m*p**2*s + 2*c*d**2*p**2*s*x + 2*c*d**2*p*s**2*x + 4*c*d**2*p*s*x*z + 2*c*d**2*s**2*u*z + 2*c*d**2*s**2*x*z + 2*c*d**2*s*u*z**2 + 2*c*d**2*s*x*z**2 - 6*c*d*m*p**2*s**2 + 6*c*d*n*p**2*s**2 - 4*c*m*p**2*s**3 + 8*c*n*p**2*s**3 - 4*c*o*p**2*s**3 + 2*d**4*g*p*v - 2*d**4*g*p*w + 4*d**4*g*v*z - 2*d**4*g*w*z - 2*d**4*g*y*z + 2*d**4*k*p*r + 4*d**4*k*r*z - 2*d**4*m*p*v + 2*d**4*m*p*w - 4*d**4*m*v*z + 2*d**4*m*w*z + 2*d**4*m*y*z - 2*d**4*p*r*x - 2*d**4*r*u*z - 2*d**4*r*x*z - 2*d**3*g*p**2*q + 4*d**3*g*p**2*r - 2*d**3*g*p**2*w + 4*d**3*g*p*s*v - 4*d**3*g*p*s*w + 4*d**3*g*p*v*z - 4*d**3*g*p*w*z + 8*d**3*g*s*v*z - 4*d**3*g*s*w*z - 4*d**3*g*s*y*z + 4*d**3*g*v*z**2 - 2*d**3*g*w*z**2 - 2*d**3*g*y*z**2 - 2*d**3*h*p**2*r + 2*d**3*h*p**2*w - 4*d**3*h*p*s*v + 4*d**3*h*p*s*w - 4*d**3*h*p*v*z + 4*d**3*h*p*w*z - 8*d**3*h*s*v*z + 4*d**3*h*s*w*z + 4*d**3*h*s*y*z - 4*d**3*h*v*z**2 + 2*d**3*h*w*z**2 + 2*d**3*h*y*z**2 - 4*d**3*k*p*q*s - 4*d**3*k*p*q*z + 4*d**3*k*p*r*s + 4*d**3*k*p*r*z - 8*d**3*k*q*s*z - 4*d**3*k*q*z**2 + 8*d**3*k*r*s*z + 4*d**3*k*r*z**2 + 2*d**3*m*p**2*w - 4*d**3*m*p*s*v + 4*d**3*m*p*s*w - 4*d**3*m*p*v*z + 4*d**3*m*p*w*z - 8*d**3*m*s*v*z + 4*d**3*m*s*w*z + 4*d**3*m*s*y*z - 4*d**3*m*v*z**2 + 2*d**3*m*w*z**2 + 2*d**3*m*y*z**2 - 2*d**3*n*p**2*w + 4*d**3*n*p*s*v - 4*d**3*n*p*s*w + 4*d**3*n*p*v*z - 4*d**3*n*p*w*z + 8*d**3*n*s*v*z - 4*d**3*n*s*w*z - 4*d**3*n*s*y*z + 4*d**3*n*v*z**2 - 2*d**3*n*w*z**2 - 2*d**3*n*y*z**2 + 2*d**3*p**2*q*x - 2*d**3*p**2*r*x + 4*d**3*p*q*s*x + 4*d**3*p*q*x*z - 4*d**3*p*r*s*x - 4*d**3*p*r*x*z + 4*d**3*q*s*u*z + 4*d**3*q*s*x*z + 2*d**3*q*u*z**2 + 2*d**3*q*x*z**2 - 4*d**3*r*s*u*z - 4*d**3*r*s*x*z - 2*d**3*r*u*z**2 - 2*d**3*r*x*z**2 + 2*d**2*f*g*p**2*s + 2*d**2*f*k*p*s**2 + 4*d**2*f*k*p*s*z + 4*d**2*f*k*s**2*z + 4*d**2*f*k*s*z**2 - 2*d**2*f*p**2*s*x - 2*d**2*f*p*s**2*x - 4*d**2*f*p*s*x*z - 2*d**2*f*s**2*u*z - 2*d**2*f*s**2*x*z - 2*d**2*f*s*u*z**2 - 2*d**2*f*s*x*z**2 - 12*d**2*g*p**2*q*s + 12*d**2*g*p**2*r*s - 2*d**2*g*p**2*s*w + 2*d**2*g*p*s**2*v - 2*d**2*g*p*s**2*w + 4*d**2*g*p*s*v*z - 4*d**2*g*p*s*w*z + 4*d**2*g*s**2*v*z - 2*d**2*g*s**2*w*z - 2*d**2*g*s**2*y*z + 4*d**2*g*s*v*z**2 - 2*d**2*g*s*w*z**2 - 2*d**2*g*s*y*z**2 + 8*d**2*h*p**2*q*s - 12*d**2*h*p**2*r*s + 4*d**2*h*p**2*s*w - 4*d**2*h*p*s**2*v + 4*d**2*h*p*s**2*w - 8*d**2*h*p*s*v*z + 8*d**2*h*p*s*w*z - 8*d**2*h*s**2*v*z + 4*d**2*h*s**2*w*z + 4*d**2*h*s**2*y*z - 8*d**2*h*s*v*z**2 + 4*d**2*h*s*w*z**2 + 4*d**2*h*s*y*z**2 - 4*d**2*k*p*q*s**2 - 8*d**2*k*p*q*s*z + 2*d**2*k*p*r*s**2 + 4*d**2*k*p*r*s*z - 8*d**2*k*q*s**2*z - 8*d**2*k*q*s*z**2 + 4*d**2*k*r*s**2*z + 4*d**2*k*r*s*z**2 + 2*d**2*l*p**2*r*s - 2*d**2*l*p**2*s*w + 2*d**2*l*p*s**2*v - 2*d**2*l*p*s**2*w + 4*d**2*l*p*s*v*z - 4*d**2*l*p*s*w*z + 4*d**2*l*s**2*v*z - 2*d**2*l*s**2*w*z - 2*d**2*l*s**2*y*z + 4*d**2*l*s*v*z**2 - 2*d**2*l*s*w*z**2 - 2*d**2*l*s*y*z**2 + 2*d**2*m*p**2*s*w - 2*d**2*m*p*s**2*v + 2*d**2*m*p*s**2*w - 4*d**2*m*p*s*v*z + 4*d**2*m*p*s*w*z - 4*d**2*m*s**2*v*z + 2*d**2*m*s**2*w*z + 2*d**2*m*s**2*y*z - 4*d**2*m*s*v*z**2 + 2*d**2*m*s*w*z**2 + 2*d**2*m*s*y*z**2 - 4*d**2*n*p**2*s*w + 4*d**2*n*p*s**2*v - 4*d**2*n*p*s**2*w + 8*d**2*n*p*s*v*z - 8*d**2*n*p*s*w*z + 8*d**2*n*s**2*v*z - 4*d**2*n*s**2*w*z - 4*d**2*n*s**2*y*z + 8*d**2*n*s*v*z**2 - 4*d**2*n*s*w*z**2 - 4*d**2*n*s*y*z**2 + 2*d**2*o*p**2*s*w - 2*d**2*o*p*s**2*v + 2*d**2*o*p*s**2*w - 4*d**2*o*p*s*v*z + 4*d**2*o*p*s*w*z - 4*d**2*o*s**2*v*z + 2*d**2*o*s**2*w*z + 2*d**2*o*s**2*y*z - 4*d**2*o*s*v*z**2 + 2*d**2*o*s*w*z**2 + 2*d**2*o*s*y*z**2 + 4*d**2*p**2*q*s*x - 2*d**2*p**2*r*s*x + 4*d**2*p*q*s**2*x + 8*d**2*p*q*s*x*z - 2*d**2*p*r*s**2*x - 4*d**2*p*r*s*x*z + 4*d**2*q*s**2*u*z + 4*d**2*q*s**2*x*z + 4*d**2*q*s*u*z**2 + 4*d**2*q*s*x*z**2 - 2*d**2*r*s**2*u*z - 2*d**2*r*s**2*x*z - 2*d**2*r*s*u*z**2 - 2*d**2*r*s*x*z**2 + 6*d*f*g*p**2*s**2 - 6*d*f*h*p**2*s**2 - 18*d*g*p**2*q*s**2 + 12*d*g*p**2*r*s**2 + 24*d*h*p**2*q*s**2 - 18*d*h*p**2*r*s**2 - 6*d*l*p**2*q*s**2 + 6*d*l*p**2*r*s**2 + 4*f*g*p**2*s**3 - 8*f*h*p**2*s**3 + 4*f*l*p**2*s**3 - 8*g*p**2*q*s**3 + 4*g*p**2*r*s**3 + 16*h*p**2*q*s**3 - 8*h*p**2*r*s**3 - 8*l*p**2*q*s**3 + 4*l*p**2*r*s**3 ) / (d**4*p**2)
-    a2 = (+2*a*d**4*k - a*d**4*u - a*d**4*x + 4*a*d**3*k*p + 4*a*d**3*k*s + 8*a*d**3*k*z - 4*a*d**3*p*x - 2*a*d**3*s*u - 2*a*d**3*s*x - 4*a*d**3*u*z - 4*a*d**3*x*z + 4*a*d**2*k*p*s + 2*a*d**2*k*p*z + 2*a*d**2*k*s**2 + 8*a*d**2*k*s*z + 2*a*d**2*k*z**2 + 6*a*d**2*m*p**2 - 6*a*d**2*n*p**2 + a*d**2*o*p**2 - a*d**2*p**2*x - 4*a*d**2*p*s*x - 2*a*d**2*p*x*z - a*d**2*s**2*u - a*d**2*s**2*x - 4*a*d**2*s*u*z - 4*a*d**2*s*x*z - a*d**2*u*z**2 - a*d**2*x*z**2 + 12*a*d*m*p**2*s - 18*a*d*n*p**2*s + 6*a*d*o*p**2*s + 6*a*m*p**2*s**2 - 12*a*n*p**2*s**2 + 6*a*o*p**2*s**2 - 4*b*d**3*k*p - 4*b*d**3*k*s - 8*b*d**3*k*z + 4*b*d**3*p*x + 2*b*d**3*s*u + 2*b*d**3*s*x + 4*b*d**3*u*z + 4*b*d**3*x*z - 8*b*d**2*k*p*s - 4*b*d**2*k*p*z - 4*b*d**2*k*s**2 - 16*b*d**2*k*s*z - 4*b*d**2*k*z**2 - 6*b*d**2*m*p**2 + 4*b*d**2*n*p**2 + 2*b*d**2*p**2*x + 8*b*d**2*p*s*x + 4*b*d**2*p*x*z + 2*b*d**2*s**2*u + 2*b*d**2*s**2*x + 8*b*d**2*s*u*z + 8*b*d**2*s*x*z + 2*b*d**2*u*z**2 + 2*b*d**2*x*z**2 - 18*b*d*m*p**2*s + 24*b*d*n*p**2*s - 6*b*d*o*p**2*s - 12*b*m*p**2*s**2 + 24*b*n*p**2*s**2 - 12*b*o*p**2*s**2 + 4*c*d**2*k*p*s + 2*c*d**2*k*p*z + 2*c*d**2*k*s**2 + 8*c*d**2*k*s*z + 2*c*d**2*k*z**2 + c*d**2*m*p**2 - c*d**2*p**2*x - 4*c*d**2*p*s*x - 2*c*d**2*p*x*z - c*d**2*s**2*u - c*d**2*s**2*x - 4*c*d**2*s*u*z - 4*c*d**2*s*x*z - c*d**2*u*z**2 - c*d**2*x*z**2 + 6*c*d*m*p**2*s - 6*c*d*n*p**2*s + 6*c*m*p**2*s**2 - 12*c*n*p**2*s**2 + 6*c*o*p**2*s**2 - 2*d**4*g*v + d**4*g*w + d**4*g*y - 2*d**4*k*r + 2*d**4*m*v - d**4*m*w - d**4*m*y + d**4*r*u + d**4*r*x - 4*d**3*g*p*v + 4*d**3*g*p*w - 4*d**3*g*s*v + 2*d**3*g*s*w + 2*d**3*g*s*y - 8*d**3*g*v*z + 4*d**3*g*w*z + 4*d**3*g*y*z + 4*d**3*h*p*v - 4*d**3*h*p*w + 4*d**3*h*s*v - 2*d**3*h*s*w - 2*d**3*h*s*y + 8*d**3*h*v*z - 4*d**3*h*w*z - 4*d**3*h*y*z + 4*d**3*k*p*q - 4*d**3*k*p*r + 4*d**3*k*q*s + 8*d**3*k*q*z - 4*d**3*k*r*s - 8*d**3*k*r*z + 4*d**3*m*p*v - 4*d**3*m*p*w + 4*d**3*m*s*v - 2*d**3*m*s*w - 2*d**3*m*s*y + 8*d**3*m*v*z - 4*d**3*m*w*z - 4*d**3*m*y*z - 4*d**3*n*p*v + 4*d**3*n*p*w - 4*d**3*n*s*v + 2*d**3*n*s*w + 2*d**3*n*s*y - 8*d**3*n*v*z + 4*d**3*n*w*z + 4*d**3*n*y*z - 4*d**3*p*q*x + 4*d**3*p*r*x - 2*d**3*q*s*u - 2*d**3*q*s*x - 4*d**3*q*u*z - 4*d**3*q*x*z + 2*d**3*r*s*u + 2*d**3*r*s*x + 4*d**3*r*u*z + 4*d**3*r*x*z - d**2*f*g*p**2 - 4*d**2*f*k*p*s - 2*d**2*f*k*p*z - 2*d**2*f*k*s**2 - 8*d**2*f*k*s*z - 2*d**2*f*k*z**2 + d**2*f*p**2*x + 4*d**2*f*p*s*x + 2*d**2*f*p*x*z + d**2*f*s**2*u + d**2*f*s**2*x + 4*d**2*f*s*u*z + 4*d**2*f*s*x*z + d**2*f*u*z**2 + d**2*f*x*z**2 + 6*d**2*g*p**2*q - 6*d**2*g*p**2*r + d**2*g*p**2*w - 4*d**2*g*p*s*v + 4*d**2*g*p*s*w - 2*d**2*g*p*v*z + 2*d**2*g*p*w*z - 2*d**2*g*s**2*v + d**2*g*s**2*w + d**2*g*s**2*y - 8*d**2*g*s*v*z + 4*d**2*g*s*w*z + 4*d**2*g*s*y*z - 2*d**2*g*v*z**2 + d**2*g*w*z**2 + d**2*g*y*z**2 - 4*d**2*h*p**2*q + 6*d**2*h*p**2*r - 2*d**2*h*p**2*w + 8*d**2*h*p*s*v - 8*d**2*h*p*s*w + 4*d**2*h*p*v*z - 4*d**2*h*p*w*z + 4*d**2*h*s**2*v - 2*d**2*h*s**2*w - 2*d**2*h*s**2*y + 16*d**2*h*s*v*z - 8*d**2*h*s*w*z - 8*d**2*h*s*y*z + 4*d**2*h*v*z**2 - 2*d**2*h*w*z**2 - 2*d**2*h*y*z**2 + 8*d**2*k*p*q*s + 4*d**2*k*p*q*z - 4*d**2*k*p*r*s - 2*d**2*k*p*r*z + 4*d**2*k*q*s**2 + 16*d**2*k*q*s*z + 4*d**2*k*q*z**2 - 2*d**2*k*r*s**2 - 8*d**2*k*r*s*z - 2*d**2*k*r*z**2 - d**2*l*p**2*r + d**2*l*p**2*w - 4*d**2*l*p*s*v + 4*d**2*l*p*s*w - 2*d**2*l*p*v*z + 2*d**2*l*p*w*z - 2*d**2*l*s**2*v + d**2*l*s**2*w + d**2*l*s**2*y - 8*d**2*l*s*v*z + 4*d**2*l*s*w*z + 4*d**2*l*s*y*z - 2*d**2*l*v*z**2 + d**2*l*w*z**2 + d**2*l*y*z**2 - d**2*m*p**2*w + 4*d**2*m*p*s*v - 4*d**2*m*p*s*w + 2*d**2*m*p*v*z - 2*d**2*m*p*w*z + 2*d**2*m*s**2*v - d**2*m*s**2*w - d**2*m*s**2*y + 8*d**2*m*s*v*z - 4*d**2*m*s*w*z - 4*d**2*m*s*y*z + 2*d**2*m*v*z**2 - d**2*m*w*z**2 - d**2*m*y*z**2 + 2*d**2*n*p**2*w - 8*d**2*n*p*s*v + 8*d**2*n*p*s*w - 4*d**2*n*p*v*z + 4*d**2*n*p*w*z - 4*d**2*n*s**2*v + 2*d**2*n*s**2*w + 2*d**2*n*s**2*y - 16*d**2*n*s*v*z + 8*d**2*n*s*w*z + 8*d**2*n*s*y*z - 4*d**2*n*v*z**2 + 2*d**2*n*w*z**2 + 2*d**2*n*y*z**2 - d**2*o*p**2*w + 4*d**2*o*p*s*v - 4*d**2*o*p*s*w + 2*d**2*o*p*v*z - 2*d**2*o*p*w*z + 2*d**2*o*s**2*v - d**2*o*s**2*w - d**2*o*s**2*y + 8*d**2*o*s*v*z - 4*d**2*o*s*w*z - 4*d**2*o*s*y*z + 2*d**2*o*v*z**2 - d**2*o*w*z**2 - d**2*o*y*z**2 - 2*d**2*p**2*q*x + d**2*p**2*r*x - 8*d**2*p*q*s*x - 4*d**2*p*q*x*z + 4*d**2*p*r*s*x + 2*d**2*p*r*x*z - 2*d**2*q*s**2*u - 2*d**2*q*s**2*x - 8*d**2*q*s*u*z - 8*d**2*q*s*x*z - 2*d**2*q*u*z**2 - 2*d**2*q*x*z**2 + d**2*r*s**2*u + d**2*r*s**2*x + 4*d**2*r*s*u*z + 4*d**2*r*s*x*z + d**2*r*u*z**2 + d**2*r*x*z**2 - 6*d*f*g*p**2*s + 6*d*f*h*p**2*s + 18*d*g*p**2*q*s - 12*d*g*p**2*r*s - 24*d*h*p**2*q*s + 18*d*h*p**2*r*s + 6*d*l*p**2*q*s - 6*d*l*p**2*r*s - 6*f*g*p**2*s**2 + 12*f*h*p**2*s**2 - 6*f*l*p**2*s**2 + 12*g*p**2*q*s**2 - 6*g*p**2*r*s**2 - 24*h*p**2*q*s**2 + 12*h*p**2*r*s**2 + 12*l*p**2*q*s**2 - 6*l*p**2*r*s**2 ) / (d**4*p**2)
-    a3 = (-4*a*d**3*k + 2*a*d**3*u + 2*a*d**3*x - 2*a*d**2*k*p - 4*a*d**2*k*s - 4*a*d**2*k*z + 2*a*d**2*p*x + 2*a*d**2*s*u + 2*a*d**2*s*x + 2*a*d**2*u*z + 2*a*d**2*x*z - 4*a*d*m*p**2 + 6*a*d*n*p**2 - 2*a*d*o*p**2 - 4*a*m*p**2*s + 8*a*n*p**2*s - 4*a*o*p**2*s + 4*b*d**3*k - 2*b*d**3*u - 2*b*d**3*x + 4*b*d**2*k*p + 8*b*d**2*k*s + 8*b*d**2*k*z - 4*b*d**2*p*x - 4*b*d**2*s*u - 4*b*d**2*s*x - 4*b*d**2*u*z - 4*b*d**2*x*z + 6*b*d*m*p**2 - 8*b*d*n*p**2 + 2*b*d*o*p**2 + 8*b*m*p**2*s - 16*b*n*p**2*s + 8*b*o*p**2*s - 2*c*d**2*k*p - 4*c*d**2*k*s - 4*c*d**2*k*z + 2*c*d**2*p*x + 2*c*d**2*s*u + 2*c*d**2*s*x + 2*c*d**2*u*z + 2*c*d**2*x*z - 2*c*d*m*p**2 + 2*c*d*n*p**2 - 4*c*m*p**2*s + 8*c*n*p**2*s - 4*c*o*p**2*s + 4*d**3*g*v - 2*d**3*g*w - 2*d**3*g*y - 4*d**3*h*v + 2*d**3*h*w + 2*d**3*h*y - 4*d**3*k*q + 4*d**3*k*r - 4*d**3*m*v + 2*d**3*m*w + 2*d**3*m*y + 4*d**3*n*v - 2*d**3*n*w - 2*d**3*n*y + 2*d**3*q*u + 2*d**3*q*x - 2*d**3*r*u - 2*d**3*r*x + 2*d**2*f*k*p + 4*d**2*f*k*s + 4*d**2*f*k*z - 2*d**2*f*p*x - 2*d**2*f*s*u - 2*d**2*f*s*x - 2*d**2*f*u*z - 2*d**2*f*x*z + 2*d**2*g*p*v - 2*d**2*g*p*w + 4*d**2*g*s*v - 2*d**2*g*s*w - 2*d**2*g*s*y + 4*d**2*g*v*z - 2*d**2*g*w*z - 2*d**2*g*y*z - 4*d**2*h*p*v + 4*d**2*h*p*w - 8*d**2*h*s*v + 4*d**2*h*s*w + 4*d**2*h*s*y - 8*d**2*h*v*z + 4*d**2*h*w*z + 4*d**2*h*y*z - 4*d**2*k*p*q + 2*d**2*k*p*r - 8*d**2*k*q*s - 8*d**2*k*q*z + 4*d**2*k*r*s + 4*d**2*k*r*z + 2*d**2*l*p*v - 2*d**2*l*p*w + 4*d**2*l*s*v - 2*d**2*l*s*w - 2*d**2*l*s*y + 4*d**2*l*v*z - 2*d**2*l*w*z - 2*d**2*l*y*z - 2*d**2*m*p*v + 2*d**2*m*p*w - 4*d**2*m*s*v + 2*d**2*m*s*w + 2*d**2*m*s*y - 4*d**2*m*v*z + 2*d**2*m*w*z + 2*d**2*m*y*z + 4*d**2*n*p*v - 4*d**2*n*p*w + 8*d**2*n*s*v - 4*d**2*n*s*w - 4*d**2*n*s*y + 8*d**2*n*v*z - 4*d**2*n*w*z - 4*d**2*n*y*z - 2*d**2*o*p*v + 2*d**2*o*p*w - 4*d**2*o*s*v + 2*d**2*o*s*w + 2*d**2*o*s*y - 4*d**2*o*v*z + 2*d**2*o*w*z + 2*d**2*o*y*z + 4*d**2*p*q*x - 2*d**2*p*r*x + 4*d**2*q*s*u + 4*d**2*q*s*x + 4*d**2*q*u*z + 4*d**2*q*x*z - 2*d**2*r*s*u - 2*d**2*r*s*x - 2*d**2*r*u*z - 2*d**2*r*x*z + 2*d*f*g*p**2 - 2*d*f*h*p**2 - 6*d*g*p**2*q + 4*d*g*p**2*r + 8*d*h*p**2*q - 6*d*h*p**2*r - 2*d*l*p**2*q + 2*d*l*p**2*r + 4*f*g*p**2*s - 8*f*h*p**2*s + 4*f*l*p**2*s - 8*g*p**2*q*s + 4*g*p**2*r*s + 16*h*p**2*q*s - 8*h*p**2*r*s - 8*l*p**2*q*s + 4*l*p**2*r*s ) / (d**4*p**2)
-    a4 = (+2*a*d**2*k - a*d**2*u - a*d**2*x + a*m*p**2 - 2*a*n*p**2 + a*o*p**2 - 4*b*d**2*k + 2*b*d**2*u + 2*b*d**2*x - 2*b*m*p**2 + 4*b*n*p**2 - 2*b*o*p**2 + 2*c*d**2*k - c*d**2*u - c*d**2*x + c*m*p**2 - 2*c*n*p**2 + c*o*p**2 - 2*d**2*f*k + d**2*f*u + d**2*f*x - 2*d**2*g*v + d**2*g*w + d**2*g*y + 4*d**2*h*v - 2*d**2*h*w - 2*d**2*h*y + 4*d**2*k*q - 2*d**2*k*r - 2*d**2*l*v + d**2*l*w + d**2*l*y + 2*d**2*m*v - d**2*m*w - d**2*m*y - 4*d**2*n*v + 2*d**2*n*w + 2*d**2*n*y + 2*d**2*o*v - d**2*o*w - d**2*o*y - 2*d**2*q*u - 2*d**2*q*x + d**2*r*u + d**2*r*x - f*g*p**2 + 2*f*h*p**2 - f*l*p**2 + 2*g*p**2*q - g*p**2*r - 4*h*p**2*q + 2*h*p**2*r + 2*l*p**2*q - l*p**2*r ) / (d**4*p**2)
+    ddd = d**3
+    dddd = ddd * d #d**4
+
+    a0 = (+2*a*dddd*k*p*z + 2*a*dddd*k*z**2 + a*dddd*m*p**2 - a*dddd*p**2*x - 2*a*dddd*p*x*z - a*dddd*u*z**2 - a*dddd*x*z**2 + 4*a*ddd*k*p*s*z + 4*a*ddd*k*s*z**2 + 4*a*ddd*m*p**2*s - 2*a*ddd*n*p**2*s - 2*a*ddd*p**2*s*x - 4*a*ddd*p*s*x*z - 2*a*ddd*s*u*z**2 - 2*a*ddd*s*x*z**2 + 2*a*d**2*k*p*s**2*z + 2*a*d**2*k*s**2*z**2 + 6*a*d**2*m*p**2*s**2 - 6*a*d**2*n*p**2*s**2 + a*d**2*o*p**2*s**2 - a*d**2*p**2*s**2*x - 2*a*d**2*p*s**2*x*z - a*d**2*s**2*u*z**2 - a*d**2*s**2*x*z**2 + 4*a*d*m*p**2*s**3 - 6*a*d*n*p**2*s**3 + 2*a*d*o*p**2*s**3 + a*m*p**2*s**4 - 2*a*n*p**2*s**4 + a*o*p**2*s**4 - 4*b*ddd*k*p*s*z - 4*b*ddd*k*s*z**2 - 2*b*ddd*m*p**2*s + 2*b*ddd*p**2*s*x + 4*b*ddd*p*s*x*z + 2*b*ddd*s*u*z**2 + 2*b*ddd*s*x*z**2 - 4*b*d**2*k*p*s**2*z - 4*b*d**2*k*s**2*z**2 - 6*b*d**2*m*p**2*s**2 + 4*b*d**2*n*p**2*s**2 + 2*b*d**2*p**2*s**2*x + 4*b*d**2*p*s**2*x*z + 2*b*d**2*s**2*u*z**2 + 2*b*d**2*s**2*x*z**2 - 6*b*d*m*p**2*s**3 + 8*b*d*n*p**2*s**3 - 2*b*d*o*p**2*s**3 - 2*b*m*p**2*s**4 + 4*b*n*p**2*s**4 - 2*b*o*p**2*s**4 + 2*c*d**2*k*p*s**2*z + 2*c*d**2*k*s**2*z**2 + c*d**2*m*p**2*s**2 - c*d**2*p**2*s**2*x - 2*c*d**2*p*s**2*x*z - c*d**2*s**2*u*z**2 - c*d**2*s**2*x*z**2 + 2*c*d*m*p**2*s**3 - 2*c*d*n*p**2*s**3 + c*m*p**2*s**4 - 2*c*n*p**2*s**4 + c*o*p**2*s**4 - dddd*g*p**2*r + dddd*g*p**2*w - 2*dddd*g*p*v*z + 2*dddd*g*p*w*z - 2*dddd*g*v*z**2 + dddd*g*w*z**2 + dddd*g*y*z**2 - 2*dddd*k*p*r*z - 2*dddd*k*r*z**2 - dddd*m*p**2*w + 2*dddd*m*p*v*z - 2*dddd*m*p*w*z + 2*dddd*m*v*z**2 - dddd*m*w*z**2 - dddd*m*y*z**2 + dddd*p**2*r*x + 2*dddd*p*r*x*z + dddd*r*u*z**2 + dddd*r*x*z**2 + 2*ddd*g*p**2*q*s - 4*ddd*g*p**2*r*s + 2*ddd*g*p**2*s*w - 4*ddd*g*p*s*v*z + 4*ddd*g*p*s*w*z - 4*ddd*g*s*v*z**2 + 2*ddd*g*s*w*z**2 + 2*ddd*g*s*y*z**2 + 2*ddd*h*p**2*r*s - 2*ddd*h*p**2*s*w + 4*ddd*h*p*s*v*z - 4*ddd*h*p*s*w*z + 4*ddd*h*s*v*z**2 - 2*ddd*h*s*w*z**2 - 2*ddd*h*s*y*z**2 + 4*ddd*k*p*q*s*z - 4*ddd*k*p*r*s*z + 4*ddd*k*q*s*z**2 - 4*ddd*k*r*s*z**2 - 2*ddd*m*p**2*s*w + 4*ddd*m*p*s*v*z - 4*ddd*m*p*s*w*z + 4*ddd*m*s*v*z**2 - 2*ddd*m*s*w*z**2 - 2*ddd*m*s*y*z**2 + 2*ddd*n*p**2*s*w - 4*ddd*n*p*s*v*z + 4*ddd*n*p*s*w*z - 4*ddd*n*s*v*z**2 + 2*ddd*n*s*w*z**2 + 2*ddd*n*s*y*z**2 - 2*ddd*p**2*q*s*x + 2*ddd*p**2*r*s*x - 4*ddd*p*q*s*x*z + 4*ddd*p*r*s*x*z - 2*ddd*q*s*u*z**2 - 2*ddd*q*s*x*z**2 + 2*ddd*r*s*u*z**2 + 2*ddd*r*s*x*z**2 - d**2*f*g*p**2*s**2 - 2*d**2*f*k*p*s**2*z - 2*d**2*f*k*s**2*z**2 + d**2*f*p**2*s**2*x + 2*d**2*f*p*s**2*x*z + d**2*f*s**2*u*z**2 + d**2*f*s**2*x*z**2 + 6*d**2*g*p**2*q*s**2 - 6*d**2*g*p**2*r*s**2 + d**2*g*p**2*s**2*w - 2*d**2*g*p*s**2*v*z + 2*d**2*g*p*s**2*w*z - 2*d**2*g*s**2*v*z**2 + d**2*g*s**2*w*z**2 + d**2*g*s**2*y*z**2 - 4*d**2*h*p**2*q*s**2 + 6*d**2*h*p**2*r*s**2 - 2*d**2*h*p**2*s**2*w + 4*d**2*h*p*s**2*v*z - 4*d**2*h*p*s**2*w*z + 4*d**2*h*s**2*v*z**2 - 2*d**2*h*s**2*w*z**2 - 2*d**2*h*s**2*y*z**2 + 4*d**2*k*p*q*s**2*z - 2*d**2*k*p*r*s**2*z + 4*d**2*k*q*s**2*z**2 - 2*d**2*k*r*s**2*z**2 - d**2*l*p**2*r*s**2 + d**2*l*p**2*s**2*w - 2*d**2*l*p*s**2*v*z + 2*d**2*l*p*s**2*w*z - 2*d**2*l*s**2*v*z**2 + d**2*l*s**2*w*z**2 + d**2*l*s**2*y*z**2 - d**2*m*p**2*s**2*w + 2*d**2*m*p*s**2*v*z - 2*d**2*m*p*s**2*w*z + 2*d**2*m*s**2*v*z**2 - d**2*m*s**2*w*z**2 - d**2*m*s**2*y*z**2 + 2*d**2*n*p**2*s**2*w - 4*d**2*n*p*s**2*v*z + 4*d**2*n*p*s**2*w*z - 4*d**2*n*s**2*v*z**2 + 2*d**2*n*s**2*w*z**2 + 2*d**2*n*s**2*y*z**2 - d**2*o*p**2*s**2*w + 2*d**2*o*p*s**2*v*z - 2*d**2*o*p*s**2*w*z + 2*d**2*o*s**2*v*z**2 - d**2*o*s**2*w*z**2 - d**2*o*s**2*y*z**2 - 2*d**2*p**2*q*s**2*x + d**2*p**2*r*s**2*x - 4*d**2*p*q*s**2*x*z + 2*d**2*p*r*s**2*x*z - 2*d**2*q*s**2*u*z**2 - 2*d**2*q*s**2*x*z**2 + d**2*r*s**2*u*z**2 + d**2*r*s**2*x*z**2 - 2*d*f*g*p**2*s**3 + 2*d*f*h*p**2*s**3 + 6*d*g*p**2*q*s**3 - 4*d*g*p**2*r*s**3 - 8*d*h*p**2*q*s**3 + 6*d*h*p**2*r*s**3 + 2*d*l*p**2*q*s**3 - 2*d*l*p**2*r*s**3 - f*g*p**2*s**4 + 2*f*h*p**2*s**4 - f*l*p**2*s**4 + 2*g*p**2*q*s**4 - g*p**2*r*s**4 - 4*h*p**2*q*s**4 + 2*h*p**2*r*s**4 + 2*l*p**2*q*s**4 - l*p**2*r*s**4 ) / (dddd*p**2)
+    a1 = (-2*a*dddd*k*p - 4*a*dddd*k*z + 2*a*dddd*p*x + 2*a*dddd*u*z + 2*a*dddd*x*z - 4*a*ddd*k*p*s - 4*a*ddd*k*p*z - 8*a*ddd*k*s*z - 4*a*ddd*k*z**2 - 4*a*ddd*m*p**2 + 2*a*ddd*n*p**2 + 2*a*ddd*p**2*x + 4*a*ddd*p*s*x + 4*a*ddd*p*x*z + 4*a*ddd*s*u*z + 4*a*ddd*s*x*z + 2*a*ddd*u*z**2 + 2*a*ddd*x*z**2 - 2*a*d**2*k*p*s**2 - 4*a*d**2*k*p*s*z - 4*a*d**2*k*s**2*z - 4*a*d**2*k*s*z**2 - 12*a*d**2*m*p**2*s + 12*a*d**2*n*p**2*s - 2*a*d**2*o*p**2*s + 2*a*d**2*p**2*s*x + 2*a*d**2*p*s**2*x + 4*a*d**2*p*s*x*z + 2*a*d**2*s**2*u*z + 2*a*d**2*s**2*x*z + 2*a*d**2*s*u*z**2 + 2*a*d**2*s*x*z**2 - 12*a*d*m*p**2*s**2 + 18*a*d*n*p**2*s**2 - 6*a*d*o*p**2*s**2 - 4*a*m*p**2*s**3 + 8*a*n*p**2*s**3 - 4*a*o*p**2*s**3 + 4*b*ddd*k*p*s + 4*b*ddd*k*p*z + 8*b*ddd*k*s*z + 4*b*ddd*k*z**2 + 2*b*ddd*m*p**2 - 2*b*ddd*p**2*x - 4*b*ddd*p*s*x - 4*b*ddd*p*x*z - 4*b*ddd*s*u*z - 4*b*ddd*s*x*z - 2*b*ddd*u*z**2 - 2*b*ddd*x*z**2 + 4*b*d**2*k*p*s**2 + 8*b*d**2*k*p*s*z + 8*b*d**2*k*s**2*z + 8*b*d**2*k*s*z**2 + 12*b*d**2*m*p**2*s - 8*b*d**2*n*p**2*s - 4*b*d**2*p**2*s*x - 4*b*d**2*p*s**2*x - 8*b*d**2*p*s*x*z - 4*b*d**2*s**2*u*z - 4*b*d**2*s**2*x*z - 4*b*d**2*s*u*z**2 - 4*b*d**2*s*x*z**2 + 18*b*d*m*p**2*s**2 - 24*b*d*n*p**2*s**2 + 6*b*d*o*p**2*s**2 + 8*b*m*p**2*s**3 - 16*b*n*p**2*s**3 + 8*b*o*p**2*s**3 - 2*c*d**2*k*p*s**2 - 4*c*d**2*k*p*s*z - 4*c*d**2*k*s**2*z - 4*c*d**2*k*s*z**2 - 2*c*d**2*m*p**2*s + 2*c*d**2*p**2*s*x + 2*c*d**2*p*s**2*x + 4*c*d**2*p*s*x*z + 2*c*d**2*s**2*u*z + 2*c*d**2*s**2*x*z + 2*c*d**2*s*u*z**2 + 2*c*d**2*s*x*z**2 - 6*c*d*m*p**2*s**2 + 6*c*d*n*p**2*s**2 - 4*c*m*p**2*s**3 + 8*c*n*p**2*s**3 - 4*c*o*p**2*s**3 + 2*dddd*g*p*v - 2*dddd*g*p*w + 4*dddd*g*v*z - 2*dddd*g*w*z - 2*dddd*g*y*z + 2*dddd*k*p*r + 4*dddd*k*r*z - 2*dddd*m*p*v + 2*dddd*m*p*w - 4*dddd*m*v*z + 2*dddd*m*w*z + 2*dddd*m*y*z - 2*dddd*p*r*x - 2*dddd*r*u*z - 2*dddd*r*x*z - 2*ddd*g*p**2*q + 4*ddd*g*p**2*r - 2*ddd*g*p**2*w + 4*ddd*g*p*s*v - 4*ddd*g*p*s*w + 4*ddd*g*p*v*z - 4*ddd*g*p*w*z + 8*ddd*g*s*v*z - 4*ddd*g*s*w*z - 4*ddd*g*s*y*z + 4*ddd*g*v*z**2 - 2*ddd*g*w*z**2 - 2*ddd*g*y*z**2 - 2*ddd*h*p**2*r + 2*ddd*h*p**2*w - 4*ddd*h*p*s*v + 4*ddd*h*p*s*w - 4*ddd*h*p*v*z + 4*ddd*h*p*w*z - 8*ddd*h*s*v*z + 4*ddd*h*s*w*z + 4*ddd*h*s*y*z - 4*ddd*h*v*z**2 + 2*ddd*h*w*z**2 + 2*ddd*h*y*z**2 - 4*ddd*k*p*q*s - 4*ddd*k*p*q*z + 4*ddd*k*p*r*s + 4*ddd*k*p*r*z - 8*ddd*k*q*s*z - 4*ddd*k*q*z**2 + 8*ddd*k*r*s*z + 4*ddd*k*r*z**2 + 2*ddd*m*p**2*w - 4*ddd*m*p*s*v + 4*ddd*m*p*s*w - 4*ddd*m*p*v*z + 4*ddd*m*p*w*z - 8*ddd*m*s*v*z + 4*ddd*m*s*w*z + 4*ddd*m*s*y*z - 4*ddd*m*v*z**2 + 2*ddd*m*w*z**2 + 2*ddd*m*y*z**2 - 2*ddd*n*p**2*w + 4*ddd*n*p*s*v - 4*ddd*n*p*s*w + 4*ddd*n*p*v*z - 4*ddd*n*p*w*z + 8*ddd*n*s*v*z - 4*ddd*n*s*w*z - 4*ddd*n*s*y*z + 4*ddd*n*v*z**2 - 2*ddd*n*w*z**2 - 2*ddd*n*y*z**2 + 2*ddd*p**2*q*x - 2*ddd*p**2*r*x + 4*ddd*p*q*s*x + 4*ddd*p*q*x*z - 4*ddd*p*r*s*x - 4*ddd*p*r*x*z + 4*ddd*q*s*u*z + 4*ddd*q*s*x*z + 2*ddd*q*u*z**2 + 2*ddd*q*x*z**2 - 4*ddd*r*s*u*z - 4*ddd*r*s*x*z - 2*ddd*r*u*z**2 - 2*ddd*r*x*z**2 + 2*d**2*f*g*p**2*s + 2*d**2*f*k*p*s**2 + 4*d**2*f*k*p*s*z + 4*d**2*f*k*s**2*z + 4*d**2*f*k*s*z**2 - 2*d**2*f*p**2*s*x - 2*d**2*f*p*s**2*x - 4*d**2*f*p*s*x*z - 2*d**2*f*s**2*u*z - 2*d**2*f*s**2*x*z - 2*d**2*f*s*u*z**2 - 2*d**2*f*s*x*z**2 - 12*d**2*g*p**2*q*s + 12*d**2*g*p**2*r*s - 2*d**2*g*p**2*s*w + 2*d**2*g*p*s**2*v - 2*d**2*g*p*s**2*w + 4*d**2*g*p*s*v*z - 4*d**2*g*p*s*w*z + 4*d**2*g*s**2*v*z - 2*d**2*g*s**2*w*z - 2*d**2*g*s**2*y*z + 4*d**2*g*s*v*z**2 - 2*d**2*g*s*w*z**2 - 2*d**2*g*s*y*z**2 + 8*d**2*h*p**2*q*s - 12*d**2*h*p**2*r*s + 4*d**2*h*p**2*s*w - 4*d**2*h*p*s**2*v + 4*d**2*h*p*s**2*w - 8*d**2*h*p*s*v*z + 8*d**2*h*p*s*w*z - 8*d**2*h*s**2*v*z + 4*d**2*h*s**2*w*z + 4*d**2*h*s**2*y*z - 8*d**2*h*s*v*z**2 + 4*d**2*h*s*w*z**2 + 4*d**2*h*s*y*z**2 - 4*d**2*k*p*q*s**2 - 8*d**2*k*p*q*s*z + 2*d**2*k*p*r*s**2 + 4*d**2*k*p*r*s*z - 8*d**2*k*q*s**2*z - 8*d**2*k*q*s*z**2 + 4*d**2*k*r*s**2*z + 4*d**2*k*r*s*z**2 + 2*d**2*l*p**2*r*s - 2*d**2*l*p**2*s*w + 2*d**2*l*p*s**2*v - 2*d**2*l*p*s**2*w + 4*d**2*l*p*s*v*z - 4*d**2*l*p*s*w*z + 4*d**2*l*s**2*v*z - 2*d**2*l*s**2*w*z - 2*d**2*l*s**2*y*z + 4*d**2*l*s*v*z**2 - 2*d**2*l*s*w*z**2 - 2*d**2*l*s*y*z**2 + 2*d**2*m*p**2*s*w - 2*d**2*m*p*s**2*v + 2*d**2*m*p*s**2*w - 4*d**2*m*p*s*v*z + 4*d**2*m*p*s*w*z - 4*d**2*m*s**2*v*z + 2*d**2*m*s**2*w*z + 2*d**2*m*s**2*y*z - 4*d**2*m*s*v*z**2 + 2*d**2*m*s*w*z**2 + 2*d**2*m*s*y*z**2 - 4*d**2*n*p**2*s*w + 4*d**2*n*p*s**2*v - 4*d**2*n*p*s**2*w + 8*d**2*n*p*s*v*z - 8*d**2*n*p*s*w*z + 8*d**2*n*s**2*v*z - 4*d**2*n*s**2*w*z - 4*d**2*n*s**2*y*z + 8*d**2*n*s*v*z**2 - 4*d**2*n*s*w*z**2 - 4*d**2*n*s*y*z**2 + 2*d**2*o*p**2*s*w - 2*d**2*o*p*s**2*v + 2*d**2*o*p*s**2*w - 4*d**2*o*p*s*v*z + 4*d**2*o*p*s*w*z - 4*d**2*o*s**2*v*z + 2*d**2*o*s**2*w*z + 2*d**2*o*s**2*y*z - 4*d**2*o*s*v*z**2 + 2*d**2*o*s*w*z**2 + 2*d**2*o*s*y*z**2 + 4*d**2*p**2*q*s*x - 2*d**2*p**2*r*s*x + 4*d**2*p*q*s**2*x + 8*d**2*p*q*s*x*z - 2*d**2*p*r*s**2*x - 4*d**2*p*r*s*x*z + 4*d**2*q*s**2*u*z + 4*d**2*q*s**2*x*z + 4*d**2*q*s*u*z**2 + 4*d**2*q*s*x*z**2 - 2*d**2*r*s**2*u*z - 2*d**2*r*s**2*x*z - 2*d**2*r*s*u*z**2 - 2*d**2*r*s*x*z**2 + 6*d*f*g*p**2*s**2 - 6*d*f*h*p**2*s**2 - 18*d*g*p**2*q*s**2 + 12*d*g*p**2*r*s**2 + 24*d*h*p**2*q*s**2 - 18*d*h*p**2*r*s**2 - 6*d*l*p**2*q*s**2 + 6*d*l*p**2*r*s**2 + 4*f*g*p**2*s**3 - 8*f*h*p**2*s**3 + 4*f*l*p**2*s**3 - 8*g*p**2*q*s**3 + 4*g*p**2*r*s**3 + 16*h*p**2*q*s**3 - 8*h*p**2*r*s**3 - 8*l*p**2*q*s**3 + 4*l*p**2*r*s**3 ) / (dddd*p**2)
+    a2 = (+2*a*dddd*k - a*dddd*u - a*dddd*x + 4*a*ddd*k*p + 4*a*ddd*k*s + 8*a*ddd*k*z - 4*a*ddd*p*x - 2*a*ddd*s*u - 2*a*ddd*s*x - 4*a*ddd*u*z - 4*a*ddd*x*z + 4*a*d**2*k*p*s + 2*a*d**2*k*p*z + 2*a*d**2*k*s**2 + 8*a*d**2*k*s*z + 2*a*d**2*k*z**2 + 6*a*d**2*m*p**2 - 6*a*d**2*n*p**2 + a*d**2*o*p**2 - a*d**2*p**2*x - 4*a*d**2*p*s*x - 2*a*d**2*p*x*z - a*d**2*s**2*u - a*d**2*s**2*x - 4*a*d**2*s*u*z - 4*a*d**2*s*x*z - a*d**2*u*z**2 - a*d**2*x*z**2 + 12*a*d*m*p**2*s - 18*a*d*n*p**2*s + 6*a*d*o*p**2*s + 6*a*m*p**2*s**2 - 12*a*n*p**2*s**2 + 6*a*o*p**2*s**2 - 4*b*ddd*k*p - 4*b*ddd*k*s - 8*b*ddd*k*z + 4*b*ddd*p*x + 2*b*ddd*s*u + 2*b*ddd*s*x + 4*b*ddd*u*z + 4*b*ddd*x*z - 8*b*d**2*k*p*s - 4*b*d**2*k*p*z - 4*b*d**2*k*s**2 - 16*b*d**2*k*s*z - 4*b*d**2*k*z**2 - 6*b*d**2*m*p**2 + 4*b*d**2*n*p**2 + 2*b*d**2*p**2*x + 8*b*d**2*p*s*x + 4*b*d**2*p*x*z + 2*b*d**2*s**2*u + 2*b*d**2*s**2*x + 8*b*d**2*s*u*z + 8*b*d**2*s*x*z + 2*b*d**2*u*z**2 + 2*b*d**2*x*z**2 - 18*b*d*m*p**2*s + 24*b*d*n*p**2*s - 6*b*d*o*p**2*s - 12*b*m*p**2*s**2 + 24*b*n*p**2*s**2 - 12*b*o*p**2*s**2 + 4*c*d**2*k*p*s + 2*c*d**2*k*p*z + 2*c*d**2*k*s**2 + 8*c*d**2*k*s*z + 2*c*d**2*k*z**2 + c*d**2*m*p**2 - c*d**2*p**2*x - 4*c*d**2*p*s*x - 2*c*d**2*p*x*z - c*d**2*s**2*u - c*d**2*s**2*x - 4*c*d**2*s*u*z - 4*c*d**2*s*x*z - c*d**2*u*z**2 - c*d**2*x*z**2 + 6*c*d*m*p**2*s - 6*c*d*n*p**2*s + 6*c*m*p**2*s**2 - 12*c*n*p**2*s**2 + 6*c*o*p**2*s**2 - 2*dddd*g*v + dddd*g*w + dddd*g*y - 2*dddd*k*r + 2*dddd*m*v - dddd*m*w - dddd*m*y + dddd*r*u + dddd*r*x - 4*ddd*g*p*v + 4*ddd*g*p*w - 4*ddd*g*s*v + 2*ddd*g*s*w + 2*ddd*g*s*y - 8*ddd*g*v*z + 4*ddd*g*w*z + 4*ddd*g*y*z + 4*ddd*h*p*v - 4*ddd*h*p*w + 4*ddd*h*s*v - 2*ddd*h*s*w - 2*ddd*h*s*y + 8*ddd*h*v*z - 4*ddd*h*w*z - 4*ddd*h*y*z + 4*ddd*k*p*q - 4*ddd*k*p*r + 4*ddd*k*q*s + 8*ddd*k*q*z - 4*ddd*k*r*s - 8*ddd*k*r*z + 4*ddd*m*p*v - 4*ddd*m*p*w + 4*ddd*m*s*v - 2*ddd*m*s*w - 2*ddd*m*s*y + 8*ddd*m*v*z - 4*ddd*m*w*z - 4*ddd*m*y*z - 4*ddd*n*p*v + 4*ddd*n*p*w - 4*ddd*n*s*v + 2*ddd*n*s*w + 2*ddd*n*s*y - 8*ddd*n*v*z + 4*ddd*n*w*z + 4*ddd*n*y*z - 4*ddd*p*q*x + 4*ddd*p*r*x - 2*ddd*q*s*u - 2*ddd*q*s*x - 4*ddd*q*u*z - 4*ddd*q*x*z + 2*ddd*r*s*u + 2*ddd*r*s*x + 4*ddd*r*u*z + 4*ddd*r*x*z - d**2*f*g*p**2 - 4*d**2*f*k*p*s - 2*d**2*f*k*p*z - 2*d**2*f*k*s**2 - 8*d**2*f*k*s*z - 2*d**2*f*k*z**2 + d**2*f*p**2*x + 4*d**2*f*p*s*x + 2*d**2*f*p*x*z + d**2*f*s**2*u + d**2*f*s**2*x + 4*d**2*f*s*u*z + 4*d**2*f*s*x*z + d**2*f*u*z**2 + d**2*f*x*z**2 + 6*d**2*g*p**2*q - 6*d**2*g*p**2*r + d**2*g*p**2*w - 4*d**2*g*p*s*v + 4*d**2*g*p*s*w - 2*d**2*g*p*v*z + 2*d**2*g*p*w*z - 2*d**2*g*s**2*v + d**2*g*s**2*w + d**2*g*s**2*y - 8*d**2*g*s*v*z + 4*d**2*g*s*w*z + 4*d**2*g*s*y*z - 2*d**2*g*v*z**2 + d**2*g*w*z**2 + d**2*g*y*z**2 - 4*d**2*h*p**2*q + 6*d**2*h*p**2*r - 2*d**2*h*p**2*w + 8*d**2*h*p*s*v - 8*d**2*h*p*s*w + 4*d**2*h*p*v*z - 4*d**2*h*p*w*z + 4*d**2*h*s**2*v - 2*d**2*h*s**2*w - 2*d**2*h*s**2*y + 16*d**2*h*s*v*z - 8*d**2*h*s*w*z - 8*d**2*h*s*y*z + 4*d**2*h*v*z**2 - 2*d**2*h*w*z**2 - 2*d**2*h*y*z**2 + 8*d**2*k*p*q*s + 4*d**2*k*p*q*z - 4*d**2*k*p*r*s - 2*d**2*k*p*r*z + 4*d**2*k*q*s**2 + 16*d**2*k*q*s*z + 4*d**2*k*q*z**2 - 2*d**2*k*r*s**2 - 8*d**2*k*r*s*z - 2*d**2*k*r*z**2 - d**2*l*p**2*r + d**2*l*p**2*w - 4*d**2*l*p*s*v + 4*d**2*l*p*s*w - 2*d**2*l*p*v*z + 2*d**2*l*p*w*z - 2*d**2*l*s**2*v + d**2*l*s**2*w + d**2*l*s**2*y - 8*d**2*l*s*v*z + 4*d**2*l*s*w*z + 4*d**2*l*s*y*z - 2*d**2*l*v*z**2 + d**2*l*w*z**2 + d**2*l*y*z**2 - d**2*m*p**2*w + 4*d**2*m*p*s*v - 4*d**2*m*p*s*w + 2*d**2*m*p*v*z - 2*d**2*m*p*w*z + 2*d**2*m*s**2*v - d**2*m*s**2*w - d**2*m*s**2*y + 8*d**2*m*s*v*z - 4*d**2*m*s*w*z - 4*d**2*m*s*y*z + 2*d**2*m*v*z**2 - d**2*m*w*z**2 - d**2*m*y*z**2 + 2*d**2*n*p**2*w - 8*d**2*n*p*s*v + 8*d**2*n*p*s*w - 4*d**2*n*p*v*z + 4*d**2*n*p*w*z - 4*d**2*n*s**2*v + 2*d**2*n*s**2*w + 2*d**2*n*s**2*y - 16*d**2*n*s*v*z + 8*d**2*n*s*w*z + 8*d**2*n*s*y*z - 4*d**2*n*v*z**2 + 2*d**2*n*w*z**2 + 2*d**2*n*y*z**2 - d**2*o*p**2*w + 4*d**2*o*p*s*v - 4*d**2*o*p*s*w + 2*d**2*o*p*v*z - 2*d**2*o*p*w*z + 2*d**2*o*s**2*v - d**2*o*s**2*w - d**2*o*s**2*y + 8*d**2*o*s*v*z - 4*d**2*o*s*w*z - 4*d**2*o*s*y*z + 2*d**2*o*v*z**2 - d**2*o*w*z**2 - d**2*o*y*z**2 - 2*d**2*p**2*q*x + d**2*p**2*r*x - 8*d**2*p*q*s*x - 4*d**2*p*q*x*z + 4*d**2*p*r*s*x + 2*d**2*p*r*x*z - 2*d**2*q*s**2*u - 2*d**2*q*s**2*x - 8*d**2*q*s*u*z - 8*d**2*q*s*x*z - 2*d**2*q*u*z**2 - 2*d**2*q*x*z**2 + d**2*r*s**2*u + d**2*r*s**2*x + 4*d**2*r*s*u*z + 4*d**2*r*s*x*z + d**2*r*u*z**2 + d**2*r*x*z**2 - 6*d*f*g*p**2*s + 6*d*f*h*p**2*s + 18*d*g*p**2*q*s - 12*d*g*p**2*r*s - 24*d*h*p**2*q*s + 18*d*h*p**2*r*s + 6*d*l*p**2*q*s - 6*d*l*p**2*r*s - 6*f*g*p**2*s**2 + 12*f*h*p**2*s**2 - 6*f*l*p**2*s**2 + 12*g*p**2*q*s**2 - 6*g*p**2*r*s**2 - 24*h*p**2*q*s**2 + 12*h*p**2*r*s**2 + 12*l*p**2*q*s**2 - 6*l*p**2*r*s**2 ) / (dddd*p**2)
+    a3 = (-4*a*ddd*k + 2*a*ddd*u + 2*a*ddd*x - 2*a*d**2*k*p - 4*a*d**2*k*s - 4*a*d**2*k*z + 2*a*d**2*p*x + 2*a*d**2*s*u + 2*a*d**2*s*x + 2*a*d**2*u*z + 2*a*d**2*x*z - 4*a*d*m*p**2 + 6*a*d*n*p**2 - 2*a*d*o*p**2 - 4*a*m*p**2*s + 8*a*n*p**2*s - 4*a*o*p**2*s + 4*b*ddd*k - 2*b*ddd*u - 2*b*ddd*x + 4*b*d**2*k*p + 8*b*d**2*k*s + 8*b*d**2*k*z - 4*b*d**2*p*x - 4*b*d**2*s*u - 4*b*d**2*s*x - 4*b*d**2*u*z - 4*b*d**2*x*z + 6*b*d*m*p**2 - 8*b*d*n*p**2 + 2*b*d*o*p**2 + 8*b*m*p**2*s - 16*b*n*p**2*s + 8*b*o*p**2*s - 2*c*d**2*k*p - 4*c*d**2*k*s - 4*c*d**2*k*z + 2*c*d**2*p*x + 2*c*d**2*s*u + 2*c*d**2*s*x + 2*c*d**2*u*z + 2*c*d**2*x*z - 2*c*d*m*p**2 + 2*c*d*n*p**2 - 4*c*m*p**2*s + 8*c*n*p**2*s - 4*c*o*p**2*s + 4*ddd*g*v - 2*ddd*g*w - 2*ddd*g*y - 4*ddd*h*v + 2*ddd*h*w + 2*ddd*h*y - 4*ddd*k*q + 4*ddd*k*r - 4*ddd*m*v + 2*ddd*m*w + 2*ddd*m*y + 4*ddd*n*v - 2*ddd*n*w - 2*ddd*n*y + 2*ddd*q*u + 2*ddd*q*x - 2*ddd*r*u - 2*ddd*r*x + 2*d**2*f*k*p + 4*d**2*f*k*s + 4*d**2*f*k*z - 2*d**2*f*p*x - 2*d**2*f*s*u - 2*d**2*f*s*x - 2*d**2*f*u*z - 2*d**2*f*x*z + 2*d**2*g*p*v - 2*d**2*g*p*w + 4*d**2*g*s*v - 2*d**2*g*s*w - 2*d**2*g*s*y + 4*d**2*g*v*z - 2*d**2*g*w*z - 2*d**2*g*y*z - 4*d**2*h*p*v + 4*d**2*h*p*w - 8*d**2*h*s*v + 4*d**2*h*s*w + 4*d**2*h*s*y - 8*d**2*h*v*z + 4*d**2*h*w*z + 4*d**2*h*y*z - 4*d**2*k*p*q + 2*d**2*k*p*r - 8*d**2*k*q*s - 8*d**2*k*q*z + 4*d**2*k*r*s + 4*d**2*k*r*z + 2*d**2*l*p*v - 2*d**2*l*p*w + 4*d**2*l*s*v - 2*d**2*l*s*w - 2*d**2*l*s*y + 4*d**2*l*v*z - 2*d**2*l*w*z - 2*d**2*l*y*z - 2*d**2*m*p*v + 2*d**2*m*p*w - 4*d**2*m*s*v + 2*d**2*m*s*w + 2*d**2*m*s*y - 4*d**2*m*v*z + 2*d**2*m*w*z + 2*d**2*m*y*z + 4*d**2*n*p*v - 4*d**2*n*p*w + 8*d**2*n*s*v - 4*d**2*n*s*w - 4*d**2*n*s*y + 8*d**2*n*v*z - 4*d**2*n*w*z - 4*d**2*n*y*z - 2*d**2*o*p*v + 2*d**2*o*p*w - 4*d**2*o*s*v + 2*d**2*o*s*w + 2*d**2*o*s*y - 4*d**2*o*v*z + 2*d**2*o*w*z + 2*d**2*o*y*z + 4*d**2*p*q*x - 2*d**2*p*r*x + 4*d**2*q*s*u + 4*d**2*q*s*x + 4*d**2*q*u*z + 4*d**2*q*x*z - 2*d**2*r*s*u - 2*d**2*r*s*x - 2*d**2*r*u*z - 2*d**2*r*x*z + 2*d*f*g*p**2 - 2*d*f*h*p**2 - 6*d*g*p**2*q + 4*d*g*p**2*r + 8*d*h*p**2*q - 6*d*h*p**2*r - 2*d*l*p**2*q + 2*d*l*p**2*r + 4*f*g*p**2*s - 8*f*h*p**2*s + 4*f*l*p**2*s - 8*g*p**2*q*s + 4*g*p**2*r*s + 16*h*p**2*q*s - 8*h*p**2*r*s - 8*l*p**2*q*s + 4*l*p**2*r*s ) / (dddd*p**2)
+    a4 = (+2*a*d**2*k - a*d**2*u - a*d**2*x + a*m*p**2 - 2*a*n*p**2 + a*o*p**2 - 4*b*d**2*k + 2*b*d**2*u + 2*b*d**2*x - 2*b*m*p**2 + 4*b*n*p**2 - 2*b*o*p**2 + 2*c*d**2*k - c*d**2*u - c*d**2*x + c*m*p**2 - 2*c*n*p**2 + c*o*p**2 - 2*d**2*f*k + d**2*f*u + d**2*f*x - 2*d**2*g*v + d**2*g*w + d**2*g*y + 4*d**2*h*v - 2*d**2*h*w - 2*d**2*h*y + 4*d**2*k*q - 2*d**2*k*r - 2*d**2*l*v + d**2*l*w + d**2*l*y + 2*d**2*m*v - d**2*m*w - d**2*m*y - 4*d**2*n*v + 2*d**2*n*w + 2*d**2*n*y + 2*d**2*o*v - d**2*o*w - d**2*o*y - 2*d**2*q*u - 2*d**2*q*x + d**2*r*u + d**2*r*x - f*g*p**2 + 2*f*h*p**2 - f*l*p**2 + 2*g*p**2*q - g*p**2*r - 4*h*p**2*q + 2*h*p**2*r + 2*l*p**2*q - l*p**2*r ) / (dddd*p**2)
 
     coeff = [a4]
     coeff += [a3]
@@ -1320,27 +1438,38 @@ def get_solutions_quartic2(a, b, c, g, h, l, r, q, f, m, n, o, d, s, w, v, y, x,
     coeff += [a1]
     coeff += [a0]
 
+    #pp = np.random.rand(2, 4)
+    #print(pp)
     r = np.roots(coeff)
-    e_exec_time = time.time()
+    #r = roots_vec([coeff])[0]
 
-    solver_exec_time = e_exec_time - s_exec_time
+    #print(r)
 
     # I believe that the result may contain only real solutions since the domain is (explicitly) real?
     #r = [re(_r) for _r in r if im(_r) == 0 and _r >= 0 and _r <= 1]
-    r = [re(_r) for _r in r if im(_r) == 0]
-    r.sort()
+    #r = [re(_r) for _r in r if im(_r) == 0]
+    #r.sort()
 
     N = len(r)
     K = 0
 
+    rroots = []
+
     while K < N:
-        if r[K] >= it.x - eps and r[K] <= it.x + eps:
-            r[K] = it.x
-        elif r[K] >= it.y - eps and r[K] <= it.y + eps:
-            r[K] = it.y
+        v = r[K]
+
+        if im(v) == 0:
+            v = re(v)
+            if v >= it.x - eps and v <= it.x + eps:
+                rroots += [it.x]
+            elif v >= it.y - eps and v <= it.y + eps:
+                rroots += [it.y]
+            elif v >= it.x and v <= it.y:
+                rroots += [v]
 
         K += 1
 
+    """
     K = 0
     _r = []
 
@@ -1351,8 +1480,14 @@ def get_solutions_quartic2(a, b, c, g, h, l, r, q, f, m, n, o, d, s, w, v, y, x,
         K += 1
 
     r = _r
+    """
 
-    return solver_exec_time, r
+    rroots.sort()
+
+    e_exec_time = time.time()
+    _exec_time = e_exec_time - s_exec_time
+
+    return _exec_time, rroots
 
 def get_solutions_quad(a0, a1, a2):
     global eps
@@ -3074,6 +3209,13 @@ def get_intersections_4(ms, mp, i, prev_it = None):
                 done = False
                 col = 0
 
+                #filter step
+
+                flag = not (msu.left > mpu.right or msu.right < mpu.left or msu.top < mpu.bottom or msu.bottom > mpu.top)
+                if not flag:
+                    col = 1
+                    done = True
+
                 # Generic case where not all elements travel in the same trajectory.
                 if col == 0:
                     exec_time, r = get_solutions_quartic2(c0_cp0_x, c0_cp1_x, c0_cp2_x, c0_cp0_y, c0_cp1_y, c0_cp2_y, c1_cp0_x, c1_cp1_x, c1_cp2_x, c1_cp0_y, c1_cp1_y, c1_cp2_y, msu_dt, msu_t0, c2_cp0_x, c2_cp1_x, c2_cp2_x, c2_cp0_y, c2_cp1_y, c2_cp2_y, mpu_t0, mpu_dt, it0)
@@ -4444,6 +4586,7 @@ def get_mr_mp_intersections(MS, mp, initial_state, final_state, op = 1, p_linear
 def intersections_tests(MS, mp, initial_state, final_state, op = 1, p_linear_traj = False):
     global begin_exec_time
     global precision_0
+    global solver_exec_time
 
     msegs = []
 
@@ -6835,6 +6978,9 @@ def test2(N, p_wkt, q_wkt, mpoint_st, p_linear_traj):
     op_id = [1, 2, 4, 5, 6]
     op_st = ['Intersects', 'Touches', 'Disjoint', 'Contains', 'Within']
 
+    #op_id = [1]
+    #op_st = ['Intersects']
+
     global solver_exec_times
     global solver_exec_time
     global begin_exec_time
@@ -6899,10 +7045,17 @@ def test2(N, p_wkt, q_wkt, mpoint_st, p_linear_traj):
             t_avg += avg
             k += 1
 
+            #print(solver_exec_times)
+            #print(solver_exec_time)
+
         M = len(loads(p_wkt).exterior.coords) - 1
 
+        mptt = 'L'
+        if p_linear_traj:
+            mptt = 'Q'
+
         t_avg = t_avg / N
-        res += [(format(min_exec_time, precision3), format(max_exec_time, precision3), format(min_solver_exec_time, precision3), format(max_solver_exec_time, precision3), format(t_avg, precision), str(M), str(NIT))]
+        res += [(format(min_exec_time, precision3), format(max_exec_time, precision3), format(min_solver_exec_time, precision3), format(max_solver_exec_time, precision3), format(t_avg, precision), str(M), str(NIT), mptt)]
 
     return res
 
@@ -6926,10 +7079,47 @@ def change_coords_precision(p_wkt, precision):
     nwkt += '))'
     return nwkt
 
+def f(x1, y1, x2, y2):
+    dx = x2 - x1
+    dy = y2 - y1
+
+    m = None
+    b = None
+
+    if dx == 0:
+        b = x1
+    else:
+        m = dy / dx
+        b = y1 - m * x1
+
+    return m, b
+
+def fi(m1, b1, m2, b2):
+    if m1 == None:
+        x = b1
+        y = m2 * x + b2
+    elif m2 == None:
+        x = b2
+        y = m1 * x + b1
+    else:
+        x = (b2 - b1) / (m1 - m2)
+        y = m1 * x + b1
+
+    return x, y
+
+def f_p(x, y, m):
+    if m == None:
+        b = x
+    else:
+        b = -(m * x) + y
+
+    return m, b
+
+
 """
 
 	Tests
-	python mr_mp_pred.py 1
+	python mr_mp_pred2.py 1
 
 	Equals = Within and Contains
 	
@@ -7015,9 +7205,10 @@ if TESTING:
     #POLYGON ((-11163.62 -630.21, -11135.22 -615.38, -11118.02 -590.19, -11100.81 -630.81, -11054.21 -650.31, -11007.61 -674.33, -10961.01 -634.89, -10917.10 -636.45, -10829.27 -645.72, -10764.93 -640.98, -10732.76 -574.63, -10584.77 -567.07, -10554.62 -601.84, -10524.47 -615.51, -10494.32 -594.37, -10437.85 -565.84, -10409.61 -580.52, -10390.16 -582.78, -10351.27 -537.51, -10327.46 -574.44, -10303.66 -585.52, -10279.85 -552.50, -10198.37 -602.04, -10139.43 -586.22, -10109.95 -549.37, -10074.06 -530.44, -10002.26 -544.43, -9982.19 -544.14, -9942.05 -579.09, -9898.72 -567.84, -9855.40 -607.22, -9812.07 -550.34, -9686.21 -614.43, -9547.58 -596.15, -9401.35 -543.56, -9356.75 -568.70, -9267.57 -555.09, -9229.94 -585.97, -9154.68 -600.49, -9136.56 -616.94, -9118.44 -572.44, -9100.32 -578.37, -8955.44 -577.39, -8914.45 -534.82, -8832.46 -512.48, -8802.11 -535.92, -8771.76 -561.09, -8741.42 -567.44, -8697.03 -541.24, -8608.25 -550.54, -8558.93 -592.48, -8509.61 -587.99, -8460.29 -558.45, -8434.35 -574.43, -8382.46 -565.06, -8313.19 -591.39, -8278.55 -598.06, -8260.01 -604.50, -8241.46 -593.40, -8222.92 -604.44, -8176.40 -617.99, -8129.89 -643.14, -8083.37 -669.37, -7993.07 -680.21, -7915.95 -690.90, -7874.24 -712.69, -7832.53 -673.63, -7790.82 -643.17, -7703.00 -701.17, -7659.09 -709.04, -7628.02 -705.69, -7596.95 -655.59, -7565.88 -678.28, -7514.99 -675.08, -7489.54 -657.41, -7403.80 -684.04, -7360.57 -678.38, -7274.11 -646.91, -7229.56 -661.14, -7185.00 -695.05, -7140.45 -650.13, -7022.28 -667.06, -6946.96 -663.04, -6909.30 -683.17, -6854.80 -683.94, -6829.47 -648.51, -6778.81 -682.86, -6746.12 -679.92, -6713.44 -680.04, -6680.76 -614.82, -6534.55 -633.47, -6414.47 -642.58, -6366.85 -588.71, -6319.22 -614.40, -6271.59 -596.97, -6215.05 -671.99, -6186.78 -633.20, -6167.62 -652.15, -6129.30 -624.93, -6099.26 -649.18, -6039.17 -608.75, -5992.32 -631.45, -5898.62 -669.27, -5813.72 -692.28, -5793.41 -700.16, -5773.10 -658.35, -5752.78 -677.58, -5700.87 -688.82, -5674.91 -601.79, -5648.67 -610.90, -5622.43 -664.81, -5596.19 -615.55, -5576.46 -666.94, -5536.98 -653.64, -5507.79 -653.30, -5478.60 -634.45, -5449.41 -606.72, -5402.17 -651.70, -5307.69 -598.79, -5180.24 -662.99, -5056.44 -687.00, -4978.31 -676.99, -4939.25 -659.75, -4880.56 -672.95, -4851.22 -630.18, -4760.30 -606.69, -4733.37 -651.57, -4679.50 -634.29, -4636.38 -701.10, -4614.81 -702.03, -4548.93 -668.22, -4531.82 -739.40, -4514.72 -740.21, -4497.61 -692.36, -4454.11 -717.86, -4410.61 -762.36, -4367.11 -748.93, -4349.27 -741.41, -4331.42 -761.27, -4313.58 -703.11, -4279.53 -752.58, -4211.44 -753.98, -4164.22 -738.08, -4116.99 -687.28, -4069.77 -708.01, -3988.42 -760.40, -3947.74 -754.95, -3833.37 -721.14, -3771.04 -692.80, -3739.88 -724.65, -3715.64 -688.63, -3691.41 -708.82, -3667.18 -675.99, -3633.65 -715.98, -3566.60 -668.41, -3540.20 -661.99, -3487.41 -680.23, -3435.00 -686.95, -3399.03 -669.20, -3363.06 -642.96, -3327.09 -657.00, -3288.83 -701.46, -3269.71 -642.06, -3239.65 -678.37, -3209.59 -634.67, -3179.53 -597.49, -3084.83 -646.90, -3037.48 -609.03, -2993.83 -628.00, -2972.00 -608.37, -2922.53 -658.24, -2823.60 -639.83, -2777.11 -613.03, -2684.13 -665.09, -2628.03 -686.32, -2599.98 -669.72, -2566.29 -671.20, -2549.44 -640.70, -2515.29 -717.79, -2481.14 -714.99, -2446.98 -679.12, -2416.14 -673.34, -2385.30 -690.70, -2354.46 -638.45, -2328.10 -668.74, -2301.73 -632.03, -2275.37 -683.83, -2179.27 -652.67, -2131.68 -683.46, -2084.10 -735.91, -2036.52 -692.11, -1933.45 -650.81, -1830.31 -707.76, -1702.80 -718.07, -1662.82 -747.44, -1642.84 -722.72, -1548.06 -639.62, -1520.83 -682.76, -1466.39 -632.48, -1418.66 -678.03, -1370.93 -660.02, -1323.20 -673.97, -1293.47 -665.98, -1263.73 -720.35, -1234.00 -714.83, -1189.87 -659.87, -1101.61 -657.18, -1073.08 -682.36, -1016.01 -686.28, -937.94 -660.24, -861.49 -674.13, -780.16 -641.48, -715.13 -648.33, -682.61 -629.74, -583.88 -623.78, -534.51 -592.83, -455.97 -615.35, -408.15 -639.92, -360.34 -597.42, -312.52 -609.85, -284.25 -629.30, -227.71 -622.48, -150.18 -631.11, -125.84 -664.93, -77.17 -643.63, 72.20 -672.91, 133.87 -653.20, 176.98 -675.27, 198.53 -685.86, 235.80 -674.29, 310.34 -670.87, 373.35 -690.21, 485.66 -612.70, 580.68 -632.43, 672.08 -625.77, 740.97 -631.05, 775.41 -642.91, 823.56 -603.35, 871.70 -604.23, 919.84 -626.28, 977.73 -584.14, 1026.27 -599.43, 1123.35 -643.78, 1154.47 -666.50, 1185.58 -626.14, 1216.69 -652.32, 1279.75 -624.94, 1311.28 -637.45, 1328.89 -601.82, 1346.51 -626.23, 1364.13 -641.59, 1462.69 -650.76, 1555.11 -683.67, 1601.32 -641.19, 1721.64 -677.96, 1751.72 -735.03, 1781.81 -741.39, 1811.89 -673.82, 1855.40 -719.04, 1942.41 -692.55, 1990.72 -679.92, 2014.87 -679.43, 2109.33 -716.51, 2203.72 -726.73, 2236.64 -762.16, 2302.47 -705.76, 2330.36 -743.45, 2358.25 -711.34, 2386.14 -701.63, 2409.60 -695.04, 2456.52 -702.54, 2547.10 -728.88, 2592.39 -747.06, 2617.64 -752.49, 2668.15 -734.05, 2726.39 -752.99, 2755.52 -741.50, 2831.00 -694.36, 2866.29 -715.23, 2936.88 -721.21, 3008.44 -726.47, 3053.79 -752.38, 3076.47 -740.83, 3178.84 -707.07, 3255.99 -731.89, 3294.57 -751.98, 3333.62 -730.13, 3411.71 -714.21, 3428.97 -714.27, 3463.50 -693.79, 3508.21 -688.94, 3552.91 -703.41, 3597.62 -667.43, 3655.92 -731.35, 3685.07 -705.83, 3719.64 -753.92, 3736.92 -711.27, 3764.92 -750.44, 3792.91 -764.43, 3820.91 -715.37, 3961.09 -738.41, 4003.70 -747.32, 4046.32 -696.82, 4088.93 -744.09, 4135.43 -724.71, 4181.93 -728.73, 4228.44 -725.94, 4274.51 -764.15, 4366.65 -760.90, 4387.45 -746.94, 4429.05 -747.15, 4469.70 -724.93, 4551.00 -728.29, 4594.22 -724.90, 4637.45 -701.99, 4680.67 -729.87, 4721.14 -703.70, 4802.06 -719.59, 4836.82 -721.62, 4854.19 -688.95, 4885.43 -684.30, 4916.66 -695.69, 4947.89 -716.77, 4970.13 -712.77, 4992.37 -711.87, 5014.61 -718.46, 5062.76 -646.83, 5159.06 -713.27, 5237.31 -695.12, 5276.43 -690.65, 5295.75 -727.87, 5315.07 -697.85, 5334.39 -701.86, 5437.03 -717.25, 5473.59 -719.84, 5491.87 -686.21, 5554.16 -708.05, 5585.31 -717.71, 5660.02 -694.16, 5686.98 -704.74, 5740.92 -670.96, 5814.49 -649.42, 5857.18 -707.67, 5899.87 -713.13, 5942.56 -695.05, 6007.76 -624.15, 6046.71 -682.43, 6124.61 -609.16, 6216.93 -659.99, 6263.09 -630.89, 6326.25 -595.10, 6397.21 -637.61, 6432.68 -647.49, 6486.52 -629.31, 6513.43 -616.36, 6631.86 -643.59, 6737.27 -658.27, 6764.89 -645.85, 6792.51 -616.51, 6820.12 -636.16, 6890.62 -662.98, 6925.87 -648.58, 6983.00 -586.82, 7066.36 -564.95, 7100.56 -627.01, 7117.66 -589.10, 7158.46 -553.18, 7240.05 -579.10, 7261.12 -544.32, 7282.20 -542.40, 7303.27 -527.67, 7329.35 -529.51, 7355.44 -512.31, 7381.52 -510.92, 7423.51 -507.38, 7465.49 -518.85, 7507.48 -495.47, 7603.06 -479.83, 7650.84 -466.58, 7690.57 -455.32, 7730.30 -462.49, 7770.02 -475.09, 7874.53 -462.69, 7911.57 -428.74, 7948.60 -451.27, 7985.64 -469.70, 8042.13 -429.00, 8070.38 -433.53, 8169.32 -442.27, 8218.79 -498.49, 8283.02 -485.51, 8315.14 -433.20, 8339.52 -485.69, 8388.30 -468.32, 8500.90 -478.77, 8521.47 -424.34, 8542.04 -474.07, 8562.61 -487.16, 8590.64 -518.89, 8618.67 -465.43, 8646.70 -477.05, 8691.80 -487.18, 8714.35 -466.76, 8822.26 -458.24, 8868.41 -504.30, 8960.70 -503.85, 8980.40 -455.98, 9019.79 -483.77, 9074.50 -461.57, 9137.69 -466.22, 9169.28 -492.08, 9255.97 -499.04, 9299.32 -485.81, 9420.96 -511.34, 9450.90 -529.91, 9480.85 -518.94, 9510.79 -515.63, 9610.95 -560.68, 9680.33 -576.25, 9812.26 -600.71, 9754.20 -671.38, 9645.64 -670.78, 9610.95 -725.83, 9577.56 -674.08, 9544.17 -718.94, 9510.79 -708.49, 9420.96 -650.14, 9380.41 -675.98, 9339.87 -635.19, 9299.32 -673.58, 9212.63 -642.63, 9169.28 -642.29, 9106.09 -654.07, 9074.50 -647.84, 9056.26 -610.44, 9038.03 -596.06, 9019.79 -645.59, 9000.10 -614.75, 8960.70 -608.25, 8914.55 -631.21, 8822.26 -661.82, 8786.29 -657.16, 8750.32 -623.83, 8714.35 -661.09, 8669.25 -612.44, 8646.70 -611.18, 8562.61 -616.81, 8500.90 -648.84, 8463.37 -598.40, 8425.83 -656.66, 8388.30 -623.67, 8363.91 -589.92, 8315.14 -592.83, 8250.91 -622.17, 8218.79 -618.26, 8119.85 -582.04, 8070.38 -573.76, 8013.89 -585.75, 7985.64 -582.37, 7874.53 -616.68, 7839.70 -566.53, 7804.86 -598.00, 7770.02 -588.12, 7650.84 -596.70, 7555.27 -606.78, 7507.48 -672.98, 7381.52 -682.30, 7303.27 -712.04, 7240.05 -744.71, 7199.26 -689.79, 7117.66 -755.94, 7083.46 -752.20, 7066.36 -721.80, 7038.57 -763.52, 7010.79 -776.38, 6983.00 -794.42, 6963.96 -730.31, 6944.91 -783.89, 6925.87 -791.56, 6855.37 -772.27, 6820.12 -769.96, 6737.27 -755.39, 6702.14 -752.22, 6667.00 -777.10, 6631.86 -803.86, 6592.39 -794.43, 6552.91 -769.65, 6513.43 -754.73, 6459.60 -789.30, 6432.68 -820.38, 6361.73 -767.94, 6326.25 -761.10, 6305.19 -758.99, 6284.14 -759.61, 6263.09 -785.97, 6170.77 -772.81, 6124.61 -755.01, 6085.66 -799.81, 6007.76 -824.98, 5986.03 -784.35, 5964.29 -793.25, 5942.56 -819.45, 5814.49 -857.55, 5789.97 -832.08, 5765.44 -829.42, 5740.92 -853.50, 5713.95 -863.33, 5660.02 -860.64, 5635.12 -848.31, 5610.21 -815.64, 5585.31 -852.90, 5523.02 -881.64, 5491.87 -841.14, 5455.31 -830.20, 5437.03 -850.84, 5402.82 -834.59, 5368.60 -818.94, 5334.39 -862.60, 5276.43 -840.03, 5198.18 -820.06, 5159.06 -820.46, 5110.91 -796.74, 5014.61 -860.22, 4947.89 -870.89, 4854.19 -819.06, 4819.44 -811.78, 4802.06 -860.61, 4761.60 -821.93, 4680.67 -896.57, 4551.00 -893.25, 4510.35 -929.70, 4429.05 -891.82, 4408.25 -911.29, 4366.65 -950.94, 4320.58 -894.47, 4228.44 -855.24, 4088.93 -871.84, 3961.09 -875.97, 3914.36 -894.36, 3867.63 -864.92, 3820.91 -880.86, 3736.92 -909.83, 3702.35 -887.88, 3685.07 -874.27, 3626.77 -868.20, 3597.62 -873.67, 3463.50 -838.41, 3446.24 -882.82, 3411.71 -844.33, 3372.67 -846.47, 3294.57 -876.90, 3217.42 -879.86, 3178.84 -887.62, 3144.71 -880.79, 3110.59 -839.91, 3076.47 -879.22, 3031.11 -869.56, 3008.44 -937.69, 2984.59 -851.90, 2960.73 -865.26, 2936.88 -882.02, 2901.59 -830.23, 2831.00 -896.64, 2805.84 -857.50, 2780.68 -845.12, 2755.52 -874.46, 2697.27 -936.17, 2668.15 -912.93, 2642.90 -898.58, 2592.39 -862.30, 2501.81 -856.63, 2456.52 -852.63, 2433.06 -834.58, 2386.14 -865.53, 2302.47 -848.03, 2269.56 -875.29, 2203.72 -874.12, 2172.26 -895.36, 2140.79 -877.19, 2109.33 -863.89, 2077.84 -863.29, 2046.36 -796.86, 2014.87 -832.82, 1966.56 -839.86, 1942.41 -836.49, 1898.91 -813.14, 1811.89 -911.81, 1721.64 -831.63, 1681.53 -854.93, 1641.42 -853.98, 1601.32 -831.34, 1508.90 -815.75, 1462.69 -790.54, 1429.84 -774.43, 1396.98 -807.08, 1364.13 -756.46, 1311.28 -827.77, 1248.22 -787.23, 1216.69 -795.76, 1123.35 -733.32, 1074.81 -729.89, 977.73 -757.04, 958.43 -784.20, 939.14 -754.18, 919.84 -773.27, 775.41 -777.88, 706.52 -752.09, 672.08 -817.93, 641.61 -822.04, 611.15 -815.88, 580.68 -837.59, 549.01 -774.94, 517.34 -759.64, 485.66 -808.92, 448.23 -824.96, 410.79 -803.49, 373.35 -787.36, 352.35 -797.48, 331.34 -793.02, 310.34 -825.24, 273.07 -819.80, 198.53 -800.57, 155.42 -814.72, 133.87 -836.52, 113.31 -842.59, 92.76 -811.56, 72.20 -800.22, 22.41 -825.54, -27.38 -804.38, -77.17 -788.33, -101.51 -833.12, -150.18 -809.46, -176.02 -754.02, -201.87 -735.36, -227.71 -752.72, -255.98 -784.15, -312.52 -761.64, -455.97 -753.97, -482.15 -774.50, -508.33 -764.08, -534.51 -794.79, -633.24 -735.12, -682.61 -762.83, -747.64 -748.50, -780.16 -753.74, -807.27 -807.75, -834.38 -812.02, -861.49 -839.01, -886.97 -826.47, -912.46 -802.54, -937.94 -792.65, -963.96 -794.40, -989.99 -836.80, -1016.01 -865.82, -1044.54 -814.38, -1101.61 -799.43, -1145.74 -789.85, -1234.00 -839.87, -1323.20 -846.81, -1466.39 -835.15, -1493.61 -795.82, -1548.06 -798.22, -1579.65 -838.14, -1611.24 -846.86, -1642.84 -826.58, -1682.81 -833.75, -1702.80 -876.34, -1745.30 -826.28, -1787.80 -797.10, -1830.31 -838.59, -1864.69 -826.21, -1899.07 -836.52, -1933.45 -850.02, -1967.81 -833.71, -2002.16 -830.81, -2036.52 -817.78, -2179.27 -872.38, -2211.30 -848.86, -2243.33 -813.50, -2275.37 -792.21, -2354.46 -840.91, -2446.98 -848.56, -2549.44 -857.64, -2583.14 -799.03, -2599.98 -822.33, -2656.08 -804.45, -2684.13 -803.48, -2730.62 -762.09, -2823.60 -802.91, -2873.07 -791.15, -2972.00 -753.51, -3015.65 -798.18, -3037.48 -740.96, -3132.18 -782.55, -3179.53 -795.74, -3269.71 -846.23, -3307.96 -851.51, -3327.09 -808.18, -3435.00 -818.03, -3452.47 -816.70, -3469.94 -785.60, -3487.41 -859.30, -3513.81 -811.91, -3566.60 -845.59, -3600.13 -818.88, -3667.18 -876.82, -3739.88 -869.37, -3802.21 -857.56, -3833.37 -865.98, -3871.50 -847.56, -3909.62 -834.17, -3947.74 -888.38, -4029.09 -840.93, -4069.77 -876.66, -4211.44 -873.01, -4245.48 -907.86, -4313.58 -849.64, -4367.11 -854.26, -4497.61 -857.86, -4548.93 -824.15, -4570.89 -849.28, -4592.85 -844.81, -4614.81 -809.40, -4657.94 -840.37, -4679.50 -796.01, -4706.43 -770.24, -4760.30 -763.38, -4790.60 -765.38, -4820.91 -786.29, -4851.22 -812.62, -4909.90 -809.92, -4939.25 -782.50, -5017.37 -833.96, -5056.44 -774.00, -5097.70 -794.72, -5138.97 -794.53, -5180.24 -781.28, -5222.72 -775.99, -5265.21 -760.81, -5307.69 -800.21, -5354.93 -779.69, -5449.41 -816.43, -5536.98 -797.12, -5556.72 -814.55, -5596.19 -771.34, -5674.91 -800.51, -5726.83 -791.98, -5752.78 -780.17, -5813.72 -802.71, -5842.02 -844.45, -5870.32 -804.66, -5898.62 -824.54, -5945.47 -795.92, -6039.17 -824.19, -6069.21 -756.80, -6129.30 -813.46, -6148.46 -782.03, -6186.78 -785.93, -6243.32 -811.11, -6271.59 -802.61, -6414.47 -814.80, -6454.50 -822.34, -6494.53 -811.47, -6534.55 -788.09, -6583.29 -801.45, -6632.02 -791.97, -6680.76 -770.62, -6778.81 -779.10, -6804.14 -805.98, -6854.80 -791.93, -6872.97 -821.03, -6891.13 -792.40, -6909.30 -789.16, -6984.62 -779.37, -7022.28 -779.93, -7061.67 -752.52, -7101.06 -791.04, -7140.45 -778.51, -7274.11 -801.59, -7317.34 -813.76, -7403.80 -863.68, -7432.38 -868.56, -7460.96 -860.14, -7489.54 -861.37, -7540.43 -825.04, -7565.88 -825.50, -7659.09 -882.09, -7746.91 -783.51, -7790.82 -858.50, -7915.95 -851.57, -7941.66 -808.19, -7967.36 -812.54, -7993.07 -821.49, -8023.17 -779.84, -8053.27 -798.59, -8083.37 -802.94, -8222.92 -770.52, -8278.55 -779.20, -8347.83 -769.85, -8382.46 -698.06, -8408.41 -723.02, -8460.29 -686.72, -8608.25 -725.70, -8652.64 -701.95, -8741.42 -696.38, -8832.46 -759.67, -8873.45 -745.16, -8955.44 -688.37, -9003.73 -729.93, -9052.03 -750.21, -9100.32 -743.66, -9154.68 -763.56, -9192.31 -710.01, -9267.57 -741.56, -9312.16 -694.26, -9401.35 -734.38, -9450.09 -743.60, -9498.83 -678.55, -9547.58 -697.63, -9593.79 -698.16, -9640.00 -744.36, -9686.21 -758.13, -9728.17 -752.88, -9770.12 -734.86, -9812.07 -731.35, -9942.05 -755.60, -9962.12 -740.50, -10002.26 -680.87, -10038.16 -674.08, -10109.95 -693.81, -10168.90 -676.94, -10198.37 -768.10, -10225.53 -720.65, -10252.69 -744.01, -10279.85 -706.24, -10351.27 -727.20, -10370.71 -699.92, -10409.61 -731.22, -10466.08 -725.15, -10494.32 -758.90, -10584.77 -751.18, -10634.10 -731.61, -10683.43 -711.21, -10732.76 -768.32, -10797.10 -763.17, -10829.27 -791.05, -10873.18 -782.24, -10961.01 -819.48, -11100.81 -775.06, -11182.35 -791.80, -11163.62 -630.21))
 
     op_st = ['Intersects', 'Touches', 'Disjoint', 'Contains', 'Within']
+    #op_st = ['Intersects']
 
     print('MR X MP -> P : N Tests: ' + str(NTESTS))
-    print('Op;mET (sec);MET (sec);mSET (sec);MSET (sec);AVGET %;NV;NIT')
+    print('Op;mET (sec);MET (sec);mSET (sec);MSET (sec);AVGET %;NV;NIT;MPTT')
 
     k = 0
     while k < len(op_st):
