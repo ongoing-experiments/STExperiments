@@ -10,7 +10,10 @@ Contact: hfduarte@ua.pt
 
 Dependencies:
 
-	Python 2.7
+	Python 3
+	sympy
+	numba
+	numpy
 	Shapely
 	Java
 	JTS (Java Topology Suite)
@@ -18,7 +21,7 @@ Dependencies:
 
 /gui/stexp						(Java GUI for visualization.)
 
-/scripts							(2.7 Python scripts where the algorithms were implemented.)
+/scripts							(3 Python scripts where the algorithms were implemented.)
 
 /tests							(Files with some execution results.)
 
